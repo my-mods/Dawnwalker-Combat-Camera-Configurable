@@ -2,7 +2,7 @@
 local M = {}
 M.order = {"enabled", "freeCamera", "targeting", "crosshair", "delayMs", "coneDegrees", "aimAssist", "assistStrength", "debugLogging"}
 M.rules = {
-    enabled={1,0,1}, freeCamera={1,0,1}, targeting={1,0,1}, crosshair={1,0,2},
+    enabled={1,0,1}, freeCamera={1,0,1}, targeting={1,0,1}, crosshair={0,0,2},
     delayMs={65,0,1000}, coneDegrees={45,0,90}, aimAssist={1,0,1},
     assistStrength={35,0,80}, debugLogging={0,0,1},
 }

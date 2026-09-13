@@ -30,7 +30,7 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Camera-directed targeting | On | Off / On |
 | Target switch delay | 65 ms | 0–1000 ms |
 | Targeting cone | 45° | 1–90°; 0 uses the native cone |
-| Center dot | Weapon drawn | Off / Weapon drawn / Always in gameplay |
+| Center dot | Off | Off / Weapon drawn / Always in gameplay |
 | Controller aim slowdown | On | Off / On |
 | Slowdown strength | 35% | 0–80% |
 | Logging | Off | Off / On |

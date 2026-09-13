@@ -7,7 +7,7 @@
 namespace CombatCamera {
 struct Settings {
     bool enabled{true}, freeCamera{true}, targeting{true};
-    int crosshair{1}, delayMs{65}, coneDegrees{45};
+    int crosshair{0}, delayMs{65}, coneDegrees{45};
     bool aimAssist{true};
     int assistStrength{35};
     bool debugLogging{false};

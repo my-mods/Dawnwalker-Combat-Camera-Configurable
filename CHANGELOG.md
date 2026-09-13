@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Center dot now defaults to Off.
 - Fixed Center dot Off being read as the controller-assist setting, and corrected the other settings affected by shifted native arguments.
 - Fixed a crash report appearing when quitting the game normally.
 

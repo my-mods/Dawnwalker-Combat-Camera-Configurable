@@ -31,6 +31,13 @@
       "version": "1.0.6 or later"
     }
   ],
+  "externalRequirements": [
+    {
+      "name": "The Blood of Dawnwalker (Steam)",
+      "url": "https://store.steampowered.com/app/3751260/",
+      "version": "Steam build 25232147"
+    }
+  ],
   "source": "https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable",
   "codeLicense": "MIT",
   "permissionsNote": "Original code may be used, modified, converted and redistributed, including commercially, under the MIT license. Retain the license and third-party notices. This grant does not cover third-party gameplay imagery or change the terms of bundled dependencies."

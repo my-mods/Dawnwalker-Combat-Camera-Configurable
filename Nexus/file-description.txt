@@ -1,1 +1,1 @@
-Free combat camera, camera-directed targeting, an optional center dot set to Off by default, and controller aim slowdown. Includes persistent Mod Setting Menu controls and immediate Apply. Requires Framecore UE4SS 2b and Mod Setting Menu 1.0.6 or later.
+Free combat camera, camera-directed targeting, an optional center dot set to Off by default, and controller aim slowdown. Includes persistent Mod Setting Menu controls and immediate Apply.

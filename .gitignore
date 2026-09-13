@@ -1,0 +1,9 @@
+.local/
+AGENTS.md
+*.zip
+out/
+build/
+settings.ini
+*.log
+*.pdb
+*.map

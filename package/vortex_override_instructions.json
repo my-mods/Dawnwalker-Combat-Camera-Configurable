@@ -1,0 +1,137 @@
+[
+  {
+    "type": "attribute",
+    "key": "customFileName",
+    "value": "Combat Camera - Configurable"
+  },
+  {
+    "type": "attribute",
+    "key": "version",
+    "value": "0.0.0"
+  },
+  {
+    "type": "attribute",
+    "key": "description",
+    "value": "Free combat camera, camera-directed targeting, center dot and controller aim slowdown with persistent Mod Setting Menu controls."
+  },
+  {
+    "type": "attribute",
+    "source": "mod.manifest",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "README.txt",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "LICENSE",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "CHANGELOG.md",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "THIRD-PARTY-NOTICES.md",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "LICENSES/fmt.txt",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "LICENSES/MinHook.txt",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "LICENSES/UE4SS.txt",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt"
+    ]
+  }
+]

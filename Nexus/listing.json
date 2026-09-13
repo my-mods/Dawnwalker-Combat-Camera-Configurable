@@ -2,6 +2,11 @@
   "title": "Combat Camera - Configurable",
   "game": "The Blood of Dawnwalker",
   "gameDomain": "thebloodofdawnwalker",
+  "nexus": {
+    "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/480",
+    "modId": 480,
+    "fileId": 1795
+  },
   "version": "1.0.0",
   "category": "Gameplay",
   "author": "my-mods",

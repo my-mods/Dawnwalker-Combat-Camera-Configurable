@@ -2,6 +2,8 @@
 
 Free camera control during combat in **The Blood of Dawnwalker**, with camera-directed targeting and saved settings.
 
+[Download on Nexus Mods](https://www.nexusmods.com/thebloodofdawnwalker/mods/480)
+
 - Move the combat camera freely; manual lock-on retains the normal locked camera.
 - Select enemies toward the camera, with an adjustable targeting cone and switch delay. Committed combat actions keep priority.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.

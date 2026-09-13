@@ -11,7 +11,7 @@ Free camera control during combat in **The Blood of Dawnwalker**, with camera-di
 ## Requirements
 
 - The Blood of Dawnwalker, Steam build **25232147**.
-- Dawnwalker **Framecore 2b** UE4SS runtime.
+- [Dawnwalker Framecore UE4SS runtime](https://www.nexusmods.com/thebloodofdawnwalker/mods/283), specifically **2b**.
 - [Mod Setting Menu 1.0.6 or later](https://www.nexusmods.com/thebloodofdawnwalker/mods/271) for the in-game controls and immediate Apply.
 
 ## Installation
@@ -47,6 +47,6 @@ See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
 
 ## Credits
 
-Inspired by the functionality of [Free Combat Camera – Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340). This project provides its own implementation and does not distribute that mod's binary.
+Inspired by [Free Combat Camera – Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340) by xxxxxMIKxxxxx. This is an independent implementation: no code from the original mod was copied or reused. The original mod is not required, and its DLL, configuration and bootstrap are not included.
 
 Thanks to the UE4SS contributors, the Dawnwalker Framecore maintainers, the Mod Setting Menu author for the documented Apply client, and Tsuda Kageyu and contributors for MinHook. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

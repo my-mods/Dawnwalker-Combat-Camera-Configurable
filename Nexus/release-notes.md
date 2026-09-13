@@ -1,6 +1,4 @@
-# Changelog
-
-## 1.0.0
+# Combat Camera - Configurable 1.0.0
 
 - Free combat camera with manual lock-on priority.
 - Camera-directed targeting with adjustable cone and switch delay.

@@ -1,0 +1,58 @@
+[size=5][b][color=#E8C88A]Combat Camera - Configurable[/color][/b][/size]
+
+Move the camera freely during combat and select enemies by looking toward them. Adjust the behavior in Mod Setting Menu, press Apply, and keep your choices across save loads and game launches.
+
+[size=4][b][color=#E8C88A]Features[/color][/b][/size]
+
+[list]
+[*][b][color=#A8D5C2]Free combat camera:[/color][/b] Look around during combat. Manual lock-on retains the normal locked camera.
+[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] Aim the camera toward an enemy to select them. Adjust the selection cone and the delay before switching targets. Committed combat actions retain priority.
+[*][b][color=#A8D5C2]Optional center dot:[/color][/b] Choose Off, Weapon drawn, or Always in gameplay. Off is the default. The dot uses the game's HUD and hides during menus, cinematics and loading.
+[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] Reduce right-stick camera sensitivity near your current target, with adjustable strength. It does not steer the camera, and mouse movement is excluded.
+[*][b][color=#A8D5C2]Saved settings:[/color][/b] Toggle the camera, targeting and slowdown independently. Mod Setting Menu changes take effect when you press Apply and are restored on the next launch.
+[/list]
+
+[size=4][b][color=#E8C88A]Requirements[/color][/b][/size]
+
+[list]
+[*]The Blood of Dawnwalker, Steam build [b]25232147[/b].
+[*][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/283]UE4SS for BoD by Framecore[/url], specifically version [b]2b[/b].
+[*][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/271]Mod Setting Menu[/url], version [b]1.0.6 or later[/b].
+[/list]
+
+The native component checks the supported game and runtime binaries before enabling its hooks.
+
+[size=4][b][color=#E8C88A]Installation[/color][/b][/size]
+
+[list]
+[*][b][color=#A8D5C2]Vortex:[/color][/b] Install Combat-Camera-Configurable.zip through Vortex, enable it and deploy.
+[*][b][color=#A8D5C2]Manual:[/color][/b] Copy the archive's Data/CombatCamera folder into The Blood of Dawnwalker/Dawnwalker/Binaries/Win64/ue4ss/Mods, preserving the folder structure.
+[/list]
+
+[size=4][b][color=#E8C88A]Configuration[/color][/b][/size]
+
+Open Mod Settings, select [b]Combat Camera - Configurable[/b], adjust the controls and press [b]Apply[/b].
+
+[list]
+[*][b][color=#A8D5C2]Enable mod:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Free combat camera:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.
+[*][b][color=#A8D5C2]Targeting cone:[/color][/b] 45° from the camera axis by default; adjustable from 1° to 90°. Set 0 to use the native cone.
+[*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.
+[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Slowdown strength:[/color][/b] 35% by default; adjustable from 0% to 80%.
+[*][b][color=#A8D5C2]Logging:[/color][/b] Off by default. When enabled, writes Apply events and aggregate diagnostics to Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log.
+[/list]
+
+[size=4][b][color=#E8C88A]Targeting behavior[/color][/b][/size]
+
+Automatic targeting shares a 50 ms minimum interval between full native selection passes. A fallback search waits until the next interval, while a single-target validity check can retain the current target. The game still handles eligibility, visibility and combat targeting rules. Settings are read at startup and updated through Apply, without repeated INI polling.
+
+[size=4][b][color=#E8C88A]Credits and source[/color][/b][/size]
+
+Inspired by [url=https://www.nexusmods.com/thebloodofdawnwalker/mods/340]Free Combat Camera – Camera Directed Targeting[/url] by xxxxxMIKxxxxx. [b]This is an independent implementation: no code from the original mod was copied or reused.[/b] The original mod is not required, and its DLL, configuration and bootstrap are not included.
+
+Thanks to the UE4SS contributors, Framecore, mmarcussa for Mod Setting Menu, and Tsuda Kageyu and contributors for MinHook.
+
+[url=https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable]Source code and license[/url]

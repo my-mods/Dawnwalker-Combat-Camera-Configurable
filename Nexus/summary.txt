@@ -1,0 +1,1 @@
+Free combat camera and camera-directed targeting with persistent Mod Setting Menu controls. Adjust target switching, targeting angle, an optional center dot (Off by default), and controller aim slowdown.

@@ -1,0 +1,37 @@
+{
+  "title": "Combat Camera - Configurable",
+  "game": "The Blood of Dawnwalker",
+  "gameDomain": "thebloodofdawnwalker",
+  "version": "1.0.0",
+  "category": "Gameplay",
+  "author": "my-mods",
+  "summary": "Free combat camera and camera-directed targeting with persistent Mod Setting Menu controls. Adjust target switching, targeting angle, an optional center dot (Off by default), and controller aim slowdown.",
+  "tags": [
+    "Gameplay",
+    "Quality of Life",
+    "AI generated",
+    "AI Media"
+  ],
+  "file": {
+    "displayName": "Combat Camera - Configurable",
+    "filename": "Combat-Camera-Configurable.zip",
+    "version": "1.0.0",
+    "category": "Main",
+    "modManagerDownload": true
+  },
+  "requirements": [
+    {
+      "name": "UE4SS for BoD",
+      "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/283",
+      "version": "2b (exact)"
+    },
+    {
+      "name": "Mod Setting Menu",
+      "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/271",
+      "version": "1.0.6 or later"
+    }
+  ],
+  "source": "https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable",
+  "codeLicense": "MIT",
+  "permissionsNote": "Original code may be used, modified, converted and redistributed, including commercially, under the MIT license. Retain the license and third-party notices. This grant does not cover third-party gameplay imagery or change the terms of bundled dependencies."
+}

@@ -1,0 +1,17 @@
+[size=4][b][color=#E8C88A]New: change settings while playing[/color][/b][/size]
+
+This mod lets you change its settings [b]without reloading your save[/b]. Open [b][color=#A8D5C2]Mod Settings[/color][/b], make your changes and press [b][color=#A8D5C2]Apply[/color][/b] to use them straight away.
+
+[b][color=#A8D5C2]You need:[/color][/b] [url=https://www.nexusmods.com/thebloodofdawnwalker/mods/271]Mod Setting Menu[/url] [b]1.0.6 or newer[/b].
+
+[size=4][b][color=#E8C88A]Using Framecore’s UE4SS Performance mode?[/color][/b][/size]
+[b][color=#A8D5C2]Do this once:[/color][/b]
+[list=1]
+[*][b]Close the game.[/b]
+[*]If you use [b]Vortex[/b], open [b]Framecore’s UE4SS mod folder[/b] from Vortex and find [b]UE4SS-settings.ini[/b]. For a [b]manual installation[/b], find it inside your game folder under [b]Dawnwalker\Binaries\Win64\ue4ss[/b].
+[*]Make a [b]backup[/b] of that file, then open it with [b]Notepad[/b]. Press [b]Ctrl+F[/b], search for [b]HookProcessConsoleExec[/b], and change its value from [b]0[/b] to [b]1[/b]. The line should read:
+[code]HookProcessConsoleExec = 1[/code]
+[*][b]Save the file.[/b] If you use Vortex, [b]deploy the change[/b], then start the game again.
+[/list]
+
+If the value is already [b]1[/b], leave it as it is. [b]You can keep using Performance mode.[/b] After this setup, simply press [b][color=#A8D5C2]Apply[/color][/b] whenever you change this mod’s settings.

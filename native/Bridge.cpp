@@ -60,9 +60,15 @@ struct Session final:FUObjectDeleteListener {
         for(size_t i=0;i<watched.size();++i)if(watched[i].load(std::memory_order_relaxed)==index)mask|=1u<<i;
         if(mask)invalidated.fetch_or(mask,std::memory_order_release);
     }
-    void OnUObjectArrayShutdown()override {active=false;invalidated.fetch_or(15);}
+    void OnUObjectArrayShutdown()override;
 } session;
 bool listening{};
+void Session::OnUObjectArrayShutdown() {
+    active=false;invalidated.fetch_or(15);
+    // Unregister before the engine checks its shutdown listener registry.
+    // Leave hook teardown to stop(); no dying game objects are accessed here.
+    if(listening){FUObjectArray::RemoveUObjectDeleteListener(this);listening=false;}
+}
 Identity ownerId,castLockId,assistTargetId,pendingId;
 Dwell dwell;
 bool nextFallback{};

@@ -39,6 +39,8 @@ Keep `package/mod.manifest` at archive root as `mod.manifest`, and include `READ
 
 ## Native bindings
 
+The object-array shutdown callback disables native activity, invalidates watched identities and unregisters its deletion listener before returning. Hook teardown remains in the separate stop path; repeated cleanup does not remove the listener twice or access dying game objects.
+
 The executable and host are fingerprinted before installing hooks. Changed or already modified required instructions cause initialization to stop. The address table targets only:
 
 | Input | SHA-256 |

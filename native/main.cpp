@@ -12,11 +12,13 @@ public:
     void on_lua_start(StringViewType name,Lua& lua,Lua&,Lua&,Lua*) override {
         if(name!=STR("CombatCamera"))return;
         lua.register_function("_CCSet",[](const Lua& l){
-            auto number=[&](int at,int lo,int hi){return static_cast<int>(std::clamp<int64_t>(l.get_integer(at),lo,hi));};
+            // get_integer removes the argument from the host Lua stack.
+            // Each next setting is therefore at index 1, in Settings.order.
+            auto number=[&](int lo,int hi){return static_cast<int>(std::clamp<int64_t>(l.get_integer(1),lo,hi));};
             CombatCamera::Settings s;
-            s.enabled=number(1,0,1)!=0;s.freeCamera=number(2,0,1)!=0;s.targeting=number(3,0,1)!=0;
-            s.crosshair=number(4,0,2);s.delayMs=number(5,0,1000);s.coneDegrees=number(6,0,90);
-            s.aimAssist=number(7,0,1)!=0;s.assistStrength=number(8,0,80);s.debugLogging=number(9,0,1)!=0;
+            s.enabled=number(0,1)!=0;s.freeCamera=number(0,1)!=0;s.targeting=number(0,1)!=0;
+            s.crosshair=number(0,2);s.delayMs=number(0,1000);s.coneDegrees=number(0,90);
+            s.aimAssist=number(0,1)!=0;s.assistStrength=number(0,80);s.debugLogging=number(0,1)!=0;
             CombatCamera::configure(s);return 0;
         });
         lua.register_function("_CCStart",[](const Lua& l){

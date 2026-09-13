@@ -41,6 +41,8 @@ Keep `package/mod.manifest` at archive root as `mod.manifest`, and include `READ
 
 The object-array shutdown callback disables native activity, invalidates watched identities and unregisters its deletion listener before returning. Hook teardown remains in the separate stop path; repeated cleanup does not remove the listener twice or access dying game objects.
 
+The native settings callback consumes nine Lua arguments in `Settings.order`. The pinned host's `get_integer` removes the value it reads, so each successive setting is read at stack index 1. This applies to both saved startup settings and Mod Setting Menu Apply.
+
 The executable and host are fingerprinted before installing hooks. Changed or already modified required instructions cause initialization to stop. The address table targets only:
 
 | Input | SHA-256 |

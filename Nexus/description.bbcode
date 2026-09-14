@@ -36,7 +36,7 @@ Open Mod Settings, select [b]Combat Camera - Configurable[/b], adjust the contro
 
 [size=4][b][color=#E8C88A]Targeting behavior[/color][/b][/size]
 
-Use R3 / right-stick click or your configured target-lock binding to toggle targeting. With no target lock, attacks use the untargeted forward direction and blocking keeps the game's incoming-direction checks. In fixed-target mode, unlock, look toward another enemy and lock again to change targets. Stick and mouse movement remain camera controls. Applying the targeting setting preserves the current lock state.
+Use R3 / right-stick click or your configured target-lock binding to toggle targeting. With no target lock, attacks follow the camera's horizontal heading even when the character faces elsewhere, and blocking keeps the game's incoming-direction checks. Looking up or down keeps attacks horizontal. Both locked modes keep their target-based attack direction. In fixed-target mode, unlock, look toward another enemy and lock again to change targets. Stick and mouse movement remain camera controls. Applying the targeting setting preserves the current lock state.
 
 Automatic targeting runs only while target lock and Camera-directed targeting are both on. It shares a 50 ms minimum interval between full native selection passes. A fallback search waits until the next interval, while a single-target validity check can retain the current target. The game still handles eligibility, visibility and combat targeting rules. Settings are read at startup and updated through Apply, without repeated INI polling.
 

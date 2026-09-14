@@ -1,5 +1,6 @@
 # Combat Camera - Configurable 1.0.0
 
+- Unlocked attacks follow the camera's horizontal heading even when the character is facing another direction, without selecting an enemy.
 - Prevent lock-on, spells and combat actions from reattaching the camera, preserving the selected enemy without recurring detachment repairs.
 - The normal target-lock button toggles untargeted combat and targeted combat.
 - Camera-directed targeting selects automatic camera targeting or a fixed enemy while locked.

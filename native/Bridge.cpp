@@ -176,6 +176,7 @@ thread_local void* lockButton{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
     uint64_t lockChanges{},blockedTargets{};
+    uint64_t cameraDirections{},directionFallbacks{},directionMicros{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -191,6 +192,8 @@ void report(uint64_t now) {
         L" initialDetaches="+std::to_wstring(cameraMetrics.initialDetaches.exchange(0))+
         L" crosshair="+std::to_wstring(metrics.draw)+L" assist="+std::to_wstring(metrics.assist)+
         L" lockChanges="+std::to_wstring(metrics.lockChanges)+L" blockedTargets="+std::to_wstring(metrics.blockedTargets)+
+        L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
+        L" directionUs="+std::to_wstring(metrics.directionMicros)+
         L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
@@ -464,7 +467,30 @@ extern "C" bool ShouldPreventCameraAttach(void* combat) {
     if(prevent&&cameraLogging.load(std::memory_order_relaxed))cameraMetrics.attachPrevented.fetch_add(1,std::memory_order_relaxed);
     return prevent;
 }
-extern "C" bool ShouldUseFreeDirection(void* combat) {return managed(combat)&&!playerLocked;}
+extern "C" bool ResolveFreeDirection(void* combat,Vec3* direction) {
+    if(!managed(combat)||playerLocked)return false;
+    const auto before=settings.debugLogging?clockMicros():0;
+    auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
+    auto camera=field<void*>(pc,0x370);
+    bool resolved=false;
+    if(camera){
+        Vec3 rotation{};
+        auto getRotation=method<Vec3*(*)(void*,Vec3*)>(camera,0x820);
+        auto value=getRotation?getRotation(camera,&rotation):nullptr;
+        if(value&&finite(*value)){
+            // Grounded attack direction uses yaw even when looking straight
+            // up/down. No target selection or persistent actor rotation.
+            *direction=forward({0,value->y,0});resolved=true;
+        }
+    }
+    // The gate initializes XY from native character facing. Keep that
+    // untargeted fallback when camera data is unavailable or nonfinite.
+    if(settings.debugLogging){
+        if(resolved)++metrics.cameraDirections;else ++metrics.directionFallbacks;
+        metrics.directionMicros+=clockMicros()-before;
+    }
+    return true;
+}
 extern "C" double Threshold(void* context) {
     return live()&&selecting&&context==coneContext?coneThreshold:Build::nativeCone;
 }

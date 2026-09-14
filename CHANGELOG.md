@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Unlocked attacks follow the camera's horizontal heading even when the character is facing another direction, without selecting an enemy.
 - Prevent camera reattachment at its source during lock-on, spells and combat actions, preserving selected enemies and native combat notifications.
 - Remove recurring camera-detachment repairs; detach an existing camera lock only when entering or resuming the mod's combat context.
 - Allow camera evaluation to use the validated player context independently of the gameplay thread.

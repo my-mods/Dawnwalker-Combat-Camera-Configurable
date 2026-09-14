@@ -5,7 +5,7 @@ Free camera control during combat in **The Blood of Dawnwalker**, with untargete
 [Download on Nexus Mods](https://www.nexusmods.com/thebloodofdawnwalker/mods/480)
 
 - Keep the camera free with targeting on or off.
-- Fight without a selected target until you press the normal target-lock button. Attacks use the untargeted forward direction, and blocking keeps the game's incoming-direction checks.
+- Fight without a selected target until you press the normal target-lock button. Unlocked attacks follow the camera's horizontal heading even when the character faces elsewhere. Blocking keeps the game's incoming-direction checks.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
 - Add optional controller aim slowdown during camera-directed targeting. Fixed-target and untargeted modes keep full camera sensitivity. Mouse movement is excluded.
@@ -28,7 +28,7 @@ Use **R3 / right-stick click**, or your configured keyboard/controller **target-
 
 | Target-lock state | Camera-directed targeting | Behavior |
 | --- | --- | --- |
-| Off | Either value | No selected enemy and no automatic acquisition. |
+| Off | Either value | No selected enemy or automatic acquisition. Attack toward the camera's horizontal heading. |
 | On | On | Select enemies toward the camera, using the configured cone and switch delay. |
 | On | Off | Keep the selected enemy until you unlock or the target is cleared. |
 
@@ -53,13 +53,15 @@ Camera freedom is part of Enable mod. Older `freeCamera` preferences remain read
 
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
-Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. Leave it Off during normal play.
+Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera-direction and fallback counts, plus aggregate direction-resolution time in microseconds. Leave it Off during normal play.
 
 ## Implementation
 
 Automatic target requests run only while target lock and Camera-directed targeting are both on. They have a shared 50 ms minimum interval. They make one full native selection pass per interval, deferring the fallback search to the following interval when needed. A single-target validity check can retain the current target during that wait or the switch delay. The game continues to handle candidate eligibility, occlusion and combat targeting rules. Settings updates are event-driven, and the center dot uses the native HUD canvas.
 
 See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
+
+Unlocked attack direction uses camera yaw, so looking up or down keeps attacks horizontal. If camera data is unavailable, the game uses the character's untargeted facing. Both locked modes keep their target-based attack direction.
 
 ## Credits
 

@@ -3,7 +3,7 @@
 ; stack bytes so every predicate call has aligned RSP and native shadow space.
 EXTERN ShouldFreeCamera:PROC
 EXTERN Threshold:PROC
-EXTERN ShouldUseFreeDirection:PROC
+EXTERN ResolveFreeDirection:PROC
 EXTERN ShouldPreventCameraAttach:PROC
 EXTERN AttachDirectOriginal:QWORD
 EXTERN AttachDirectContinue:QWORD
@@ -103,17 +103,24 @@ ConeGate PROC FRAME
     jmp QWORD PTR [ConeContinue]
 ConeGate ENDP
 ForwardGate PROC FRAME
-    SAVE_STATE
+    SAVE_STATE 20h
+    ; Dedicated aligned scratch space above saved XMM0-XMM5. Native XY is
+    ; the fallback; the helper replaces it with camera yaw only when unlocked.
+    movsd QWORD PTR [rsp+80h], xmm7
+    movsd QWORD PTR [rsp+88h], xmm8
     mov rcx, rdi
-    call ShouldUseFreeDirection
+    lea rdx, [rsp+80h]
+    call ResolveFreeDirection
     test al, al
     jz vanilla_direction
-    RESTORE_STATE
-    ; The game has already calculated its normalized planar forward vector.
-    ; Use its existing no-target result, bypassing both combat/action targets.
+    movsd xmm7, QWORD PTR [rsp+80h]
+    movsd xmm8, QWORD PTR [rsp+88h]
+    RESTORE_STATE 20h
+    ; Reuse native output stores (including zero Z) and its full epilogue,
+    ; which restores the caller's nonvolatile XMM7/XMM8.
     jmp QWORD PTR [ForwardContinue]
 vanilla_direction:
-    RESTORE_STATE
+    RESTORE_STATE 20h
     jmp QWORD PTR [ForwardOriginal]
 ForwardGate ENDP
 ; Skip only the attachment store. Every surrounding instruction, including

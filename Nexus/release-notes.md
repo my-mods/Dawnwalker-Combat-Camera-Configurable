@@ -1,5 +1,6 @@
 # Combat Camera - Configurable 1.0.0
 
+- Keep the camera free after lock-on, casting and combat transitions in both targeted modes.
 - The normal target-lock button toggles untargeted combat and targeted combat.
 - Camera-directed targeting selects automatic camera targeting or a fixed enemy while locked.
 - The camera stays free in every targeting state, including when Camera-directed targeting is Off.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore camera detachment after lock-on, casting and combat events in both targeted modes, without clearing the selected enemy.
+- Allow camera evaluation to use the validated player context independently of the gameplay thread.
 - The normal target-lock button toggles untargeted combat and targeted combat.
 - Camera-directed targeting selects automatic camera targeting or a fixed enemy while locked.
 - The camera stays free in every targeting state, including when Camera-directed targeting is Off.

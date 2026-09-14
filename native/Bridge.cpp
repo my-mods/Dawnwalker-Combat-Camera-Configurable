@@ -20,6 +20,15 @@
 
 extern "C" {
     void CameraGate(); void ConeGate(); void ForwardGate();
+    void AttachDirectGate(); void* AttachDirectOriginal{}; void* AttachDirectContinue{};
+    void AttachRequestGate(); void* AttachRequestOriginal{}; void* AttachRequestContinue{};
+    void AttachScriptGate(); void* AttachScriptOriginal{}; void* AttachScriptContinue{};
+    void AttachCastGate(); void* AttachCastOriginal{}; void* AttachCastContinue{};
+    void AttachAbilityGate(); void* AttachAbilityOriginal{}; void* AttachAbilityContinue{};
+    void AttachThreatGate(); void* AttachThreatOriginal{}; void* AttachThreatContinue{};
+    void AttachCombatGate(); void* AttachCombatOriginal{}; void* AttachCombatContinue{};
+    void AttachLockGate(); void* AttachLockOriginal{}; void* AttachLockContinue{};
+    void AttachSelectionGate(); void* AttachSelectionOriginal{}; void* AttachSelectionContinue{};
     void* CameraOriginal{}; void* CameraContinue{};
     void* ConeContinue{};
     void* ForwardOriginal{}; void* ForwardContinue{};
@@ -37,13 +46,14 @@ std::atomic_bool active{},installed{};
 // identity match; camera callbacks never inspect UObjects or gameplay fields.
 std::atomic<void*> cameraOwner{};
 std::atomic_bool cameraLogging{};
-struct CameraMetrics {std::atomic_uint64_t checks{},accepted{},otherThread{};} cameraMetrics;
+struct CameraMetrics {std::atomic_uint64_t checks{},accepted{},otherThread{},attachPrevented{},initialDetaches{};} cameraMetrics;
+bool cameraInitialized{};
 Settings settings;
 DWORD gameThread{};
 bool attempted{};
 bool inputSupported{true};
 std::wstring startError;
-std::array<void*,20> hooked{};size_t hookCount{};
+std::array<void*,32> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -84,6 +94,7 @@ bool playerLocked{};
 bool clearAttackPending{true};
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
+    cameraInitialized=false;
     cameraOwner.store(nullptr,std::memory_order_release);
     ownerId={};castLockId={};assistTargetId={};pendingId={};dwell.clear();nextFallback=false;assistScale=1;assistAt=0;playerLocked=false;clearAttackPending=true;
     for(auto& x:session.watched)x.store(-1,std::memory_order_relaxed);
@@ -99,29 +110,41 @@ bool live(){return active.load(std::memory_order_relaxed)&&GetCurrentThreadId()=
 bool sameCurrent(void* object,const Identity& id){return id.address && identity(object)==id;}
 // These relations are checked together, rather than treating a non-null
 // controller/pawn/component pointer as a sufficient gameplay context.
-int gameplay(void* pawn) {
+int gameplay(void* pawn,bool cameraContext=false) {
     if(!pawn||field<uint8_t>(pawn,0x660))return 0;
     auto pc=field<void*>(pawn,0x2e8);auto combat=field<void*>(pawn,0xc90);
     if(!pc||!combat||field<uint8_t>(pc,0x6ec)!=1||field<void*>(pc,0x8b8)!=pawn||
        field<void*>(pc,0x2f8)!=pawn||field<void*>(combat,0xa8)!=pawn||field<int>(pc,0x8c0)!=0)return 0;
     if(field<uint8_t>(pc,0x4c8)&2)return 0; // Native cursor/menu gate.
     const auto action=field<uint8_t>(combat,0xb28);
-    if(action==10||action==11)return 0;
+    // Dead is outside gameplay. Synchronised actions retain native targeting
+    // rules, but are not an exception to free camera while player-controlled.
+    if(action==10||(!cameraContext&&action==11))return 0;
     return (field<uint8_t>(combat,0x8e)&0x10)&&field<uint8_t>(combat,0xdb8)<=2&&field<uint8_t>(combat,0xdbc)==0?2:1;
 }
-bool managed(void* combat) {
+bool managed(void* combat,bool cameraContext=false) {
     if(!live()||!combat)return false;
     if(field<void*>(combat,0)!=at<void*>(Build::PlayerCombatVtable))return false;
     syncSession();
     auto pawn=field<void*>(combat,0xa8);
-    if(!gameplay(pawn)||field<void*>(pawn,0xc90)!=combat){
-        auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
+    if(!gameplay(pawn,true)||field<void*>(pawn,0xc90)!=combat){
+        auto expected=combat;if(cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel))cameraInitialized=false;
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
     if(id!=ownerId){clearSession();ownerId=id;session.watched[0]=id.index;}
     cameraOwner.store(combat,std::memory_order_release);
-    return true;
+    // Adopt an already attached camera once on entering a managed combat
+    // context. Subsequent native attachment writes are intercepted at source.
+    // There is no recurring detached-flag check or repair after initialization.
+    if(!cameraInitialized&&(field<uint8_t>(combat,0x8e)&0x10)){
+        cameraInitialized=true;
+        if(!field<uint8_t>(combat,0x137a)){
+            at<void(*)(void*)>(Build::DetachCamera)(combat);
+            if(settings.debugLogging)cameraMetrics.initialDetaches.fetch_add(1,std::memory_order_relaxed);
+        }
+    }
+    return cameraContext||field<uint8_t>(combat,0xb28)!=11;
 }
 bool eligible(void* combat) {
     if(!managed(combat)||!playerLocked||!(field<uint8_t>(combat,0x8e)&0x10)||
@@ -151,8 +174,8 @@ thread_local bool fallbackRequest{};
 thread_local bool inRequest{};
 thread_local void* lockButton{};
 struct Metrics {
-    uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},camera{},draw{},assist{},ticks{},micros{};
-    uint64_t lockChanges{},blockedTargets{},detachRestores{};
+    uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
+    uint64_t lockChanges{},blockedTargets{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -164,22 +187,13 @@ void report(uint64_t now) {
         L" candidates="+std::to_wstring(metrics.candidates)+L" dwellChecks="+std::to_wstring(metrics.dwellChecks)+
         L" budgetSkips="+std::to_wstring(metrics.skipped)+L" camera="+std::to_wstring(cameraMetrics.accepted.exchange(0))+
         L" cameraChecks="+std::to_wstring(cameraMetrics.checks.exchange(0))+L" cameraOtherThread="+std::to_wstring(cameraMetrics.otherThread.exchange(0))+
-        L" detachRestores="+std::to_wstring(metrics.detachRestores)+
+        L" attachPrevented="+std::to_wstring(cameraMetrics.attachPrevented.exchange(0))+
+        L" initialDetaches="+std::to_wstring(cameraMetrics.initialDetaches.exchange(0))+
         L" crosshair="+std::to_wstring(metrics.draw)+L" assist="+std::to_wstring(metrics.assist)+
         L" lockChanges="+std::to_wstring(metrics.lockChanges)+L" blockedTargets="+std::to_wstring(metrics.blockedTargets)+
         L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
-}
-void detachCamera(void* combat) {
-    if(cameraOwner.load(std::memory_order_acquire)!=combat||(session.invalidated.load(std::memory_order_acquire)&1))return;
-    // SetHardLock(true), casting and native attach events clear this flag.
-    // Use the native detach transition only when attached, preserving target
-    // selection and native hard-lock combat rules without per-frame writes.
-    if((field<uint8_t>(combat,0x8e)&0x10)&&!field<uint8_t>(combat,0x137a)){
-        at<Request>(Build::DetachCamera)(combat);
-        if(settings.debugLogging)++metrics.detachRestores;
-    }
 }
 Vec3 cameraVector(void* camera,size_t slot) {
     Vec3 out{};auto value=method<Vec3*(*)(void*,Vec3*)>(camera,slot)(camera,&out);
@@ -214,7 +228,6 @@ void request(void* combat) {
     uint64_t before=settings.debugLogging?clockMicros():0;
     if(settings.debugLogging)++metrics.requests;
     originalSwitch(combat,2,parameter,false,false,false,false,false);
-    detachCamera(combat);
     selecting=previous;automaticRequest=false;fallbackRequest=false;inRequest=false;
     updateAssist(combat,now);
     if(settings.debugLogging)metrics.micros+=clockMicros()-before;
@@ -231,7 +244,6 @@ void tick(void* pawn,float delta) {
     if(managed(combat)){
         if(!(field<uint8_t>(combat,0x8e)&0x10)&&playerLocked){playerLocked=false;clearAttackPending=true;}
         if(!playerLocked)clearTarget(combat);
-        detachCamera(combat);
     }
     originalTick(pawn,delta);
     if(!live())return;
@@ -239,7 +251,6 @@ void tick(void* pawn,float delta) {
     combat=field<void*>(pawn,0xc90);
     if(managed(combat)){
         if(!playerLocked)clearTarget(combat);
-        detachCamera(combat);
     }
     if(settings.targeting && gameplay(pawn))request(combat);
     else if(settings.targeting&&settings.aimAssist&&eligible(combat)){
@@ -258,11 +269,9 @@ bool switchTarget(void* combat,uint8_t mode,float distance,bool a,bool b,bool c,
     clearAttackPending=!playerLocked;
     if(!playerLocked){clearTarget(combat);return false;}
     originalLock(combat,true);
-    detachCamera(combat);
     auto previous=selecting;const auto wasRequest=inRequest;inRequest=true;
     selecting=combat;
     const auto result=originalSwitch(combat,2,distance,false,false,false,false,false);
-    detachCamera(combat);
     selecting=previous;inRequest=wasRequest;
     if(!field<void*>(combat,0x1380)&&!settings.targeting){playerLocked=false;originalLock(combat,false);}
     return result;
@@ -307,17 +316,15 @@ void* pick(void* context) {
 void setTarget(void* combat,void* target) {
     const bool local=managed(combat);
     if(local){
-        detachCamera(combat);
         if(target&&(!playerLocked||selecting!=combat)){if(settings.debugLogging)++metrics.blockedTargets;return;}
         // Losing a manual target returns to untargeted combat. Camera targeting
         // keeps the player's request and may find another enemy on its budget.
         if(!target&&!settings.targeting&&field<void*>(combat,0x1380)){playerLocked=false;clearAttackPending=true;}
     }
     originalSetTarget(combat,target);
-    if(local)detachCamera(combat);
 }
 void nativeRequest(void* combat) {
-    if(managed(combat)){request(combat);detachCamera(combat);return;}
+    if(managed(combat)){request(combat);return;}
     originalRequest(combat);
 }
 void lockTarget(void* combat,bool locked) {
@@ -333,7 +340,6 @@ void lockTarget(void* combat,bool locked) {
         locked=playerLocked;
     }
     originalLock(combat,locked);
-    if(local)detachCamera(combat);
 }
 bool fromLockButton(void* combat,void* frame,uintptr_t offset) {
     if(!managed(combat)||!frame)return false;
@@ -450,6 +456,14 @@ extern "C" bool ShouldFreeCamera(void* combat) {
     }
     return enabled;
 }
+extern "C" bool ShouldPreventCameraAttach(void* combat) {
+    // Attachment events on the gameplay thread validate current ownership and
+    // initialize once. Other threads consume only the published opaque identity.
+    const bool prevent=GetCurrentThreadId()==gameThread?managed(combat,true):
+        active.load(std::memory_order_acquire)&&combat&&cameraOwner.load(std::memory_order_acquire)==combat;
+    if(prevent&&cameraLogging.load(std::memory_order_relaxed))cameraMetrics.attachPrevented.fetch_add(1,std::memory_order_relaxed);
+    return prevent;
+}
 extern "C" bool ShouldUseFreeDirection(void* combat) {return managed(combat)&&!playerLocked;}
 extern "C" double Threshold(void* context) {
     return live()&&selecting&&context==coneContext?coneThreshold:Build::nativeCone;
@@ -459,6 +473,7 @@ void configure(Settings value) {
     settings=value;coneThreshold=value.coneDegrees?std::max(Build::nativeCone,std::cos(value.coneDegrees*3.14159265358979323846/180.0)):Build::nativeCone;
     cameraLogging.store(value.debugLogging,std::memory_order_relaxed);
     cameraMetrics.checks=0;cameraMetrics.accepted=0;cameraMetrics.otherThread=0;
+    cameraMetrics.attachPrevented=0;cameraMetrics.initialDetaches=0;
     // Applying the targeting setting must preserve the lock-button choice.
     // freeCamera remains readable for old preference files; camera freedom is
     // now intrinsic to the enabled mod, in every targeting state.
@@ -495,6 +510,24 @@ bool start(std::wstring& error) {
         hook(Build::ActionTarget,&actionTarget,originalActionTarget);hook(Build::AttackTarget,&attackTarget,originalAttackTarget);
         ForwardContinue=at<void*>(Build::FreeDirection);
         hook(Build::Forward,reinterpret_cast<void*>(&ForwardGate),ForwardOriginal);
+        AttachDirectContinue=at<void*>(Build::AttachDirect+7);
+        hook(Build::AttachDirect,reinterpret_cast<void*>(&AttachDirectGate),AttachDirectOriginal);
+        AttachRequestContinue=at<void*>(Build::AttachRequest+7);
+        hook(Build::AttachRequest,reinterpret_cast<void*>(&AttachRequestGate),AttachRequestOriginal);
+        AttachScriptContinue=at<void*>(Build::AttachScript+7);
+        hook(Build::AttachScript,reinterpret_cast<void*>(&AttachScriptGate),AttachScriptOriginal);
+        AttachCastContinue=at<void*>(Build::AttachCast+7);
+        hook(Build::AttachCast,reinterpret_cast<void*>(&AttachCastGate),AttachCastOriginal);
+        AttachAbilityContinue=at<void*>(Build::AttachAbility+7);
+        hook(Build::AttachAbility,reinterpret_cast<void*>(&AttachAbilityGate),AttachAbilityOriginal);
+        AttachThreatContinue=at<void*>(Build::AttachThreat+7);
+        hook(Build::AttachThreat,reinterpret_cast<void*>(&AttachThreatGate),AttachThreatOriginal);
+        AttachCombatContinue=at<void*>(Build::AttachCombat+7);
+        hook(Build::AttachCombat,reinterpret_cast<void*>(&AttachCombatGate),AttachCombatOriginal);
+        AttachLockContinue=at<void*>(Build::AttachLock+7);
+        hook(Build::AttachLock,reinterpret_cast<void*>(&AttachLockGate),AttachLockOriginal);
+        AttachSelectionContinue=at<void*>(Build::AttachSelection+7);
+        hook(Build::AttachSelection,reinterpret_cast<void*>(&AttachSelectionGate),AttachSelectionOriginal);
         FUObjectArray::AddUObjectDeleteListener(&session);listening=true;
         if(MH_ApplyQueued()!=MH_OK)throw std::runtime_error("Hook activation failed");
         installed=true;active=settings.enabled&&inputSupported;return true;

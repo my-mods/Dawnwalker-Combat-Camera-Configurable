@@ -32,7 +32,7 @@ Use **R3 / right-stick click**, or your configured keyboard/controller **target-
 | On | On | Select enemies toward the camera, using the configured cone and switch delay. |
 | On | Off | Keep the selected enemy until you unlock or the target is cleared. |
 
-The camera stays free in all three states, including after lock-on, casting and combat transitions. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing Camera-directed targeting with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
+The camera stays free in all three states. Lock-on, spells and combat actions cannot reattach it to an enemy. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing Camera-directed targeting with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
 ## Configuration
 

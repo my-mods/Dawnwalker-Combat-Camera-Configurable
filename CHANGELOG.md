@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Restore camera detachment after lock-on, casting and combat events in both targeted modes, without clearing the selected enemy.
+- Prevent camera reattachment at its source during lock-on, spells and combat actions, preserving selected enemies and native combat notifications.
+- Remove recurring camera-detachment repairs; detach an existing camera lock only when entering or resuming the mod's combat context.
 - Allow camera evaluation to use the validated player context independently of the gameplay thread.
 - The normal target-lock button toggles untargeted combat and targeted combat.
 - Camera-directed targeting selects automatic camera targeting or a fixed enemy while locked.

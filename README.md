@@ -55,11 +55,13 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 
 Smooth tracking starts from the current view and eases toward the target without snapping. After manual camera movement, it waits for the resume delay (750 ms is 0.75 seconds) and eases back in over 200 ms. Tracking speed controls the mod's automatic turn strength, not a percentage of native tracking speed. At 50%, its maximum combined turn rate is 90 degrees per second.
 
+When an enemy temporarily breaks target lock to disappear, Smooth tracking waits for the game's recovery signal and reacquires that same enemy if it is still a valid target, even behind the camera. This works with fixed-target and camera-directed selection. The camera pauses during the disappearance and resumes smoothly from your current view. Unlocking cancels recovery; ordinary target loss and Free/Native behavior keep their existing rules.
+
 The saved camera keys are `cameraMode` (0 Free, 1 Smooth, 2 Native), `trackingSpeed` and `trackingResumeMs`. Older `freeCamera` preferences remain readable but do not control camera behavior. Missing camera preferences start with Free, 50% and 750 ms while existing preferences are retained.
 
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
-Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, camera-direction and fallback counts, and aggregate tracking/direction time in microseconds. Leave it Off during normal play.
+Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses and recoveries, camera-direction and fallback counts, and aggregate tracking/direction time in microseconds. Leave it Off during normal play.
 
 ## Implementation
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restore Smooth tracking after an enemy's temporary disappearance, including reappearance behind the camera, with fixed-target and camera-directed selection.
 - Add Free, Smooth tracking and Native tracking camera behaviors, independently of target selection.
 - Follow locked enemies horizontally and vertically with adjustable smooth tracking speed.
 - Yield to manual camera movement and gently resume after an adjustable pause.

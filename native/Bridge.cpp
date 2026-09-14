@@ -69,7 +69,7 @@ Identity identity(void* object) {
     return {reinterpret_cast<uintptr_t>(object),index,item->GetSerialNumber()};
 }
 struct Session final:FUObjectDeleteListener {
-    std::array<std::atomic_int,6> watched;
+    std::array<std::atomic_int,8> watched;
     std::atomic_uint32_t invalidated{};
     Session(){for(auto& x:watched)x.store(-1);}
     void NotifyUObjectDeleted(const UObjectBase*,int32_t index) override {
@@ -82,7 +82,7 @@ struct Session final:FUObjectDeleteListener {
 } session;
 bool listening{};
 void Session::OnUObjectArrayShutdown() {
-    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(63);
+    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(255);
     // Unregister before the engine checks its shutdown listener registry.
     // Leave hook teardown to stop(); no dying game objects are accessed here.
     if(listening){FUObjectArray::RemoveUObjectDeleteListener(this);listening=false;}
@@ -99,10 +99,32 @@ Dwell dwell;
 bool nextFallback{};
 bool playerLocked{};
 bool clearAttackPending{true};
+// A native temporary loss is different from an ordinary target clear. Keep
+// identities only until its scheduled regain call; never follow a hidden actor.
+Identity recoveryTargetId,recoveryActorId;
+double recoveryRemaining{};
+uint64_t recoveryLookAt{};
+bool recoveryHadLook{};
+void clearRecovery() {
+    if(!recoveryRemaining)return;
+    recoveryTargetId={};recoveryActorId={};recoveryRemaining=0;recoveryLookAt=0;recoveryHadLook=false;
+    session.watched[6]=-1;session.watched[7]=-1;
+}
+void abandonRecovery() {
+    if(recoveryRemaining&&!settings.targeting){playerLocked=false;clearAttackPending=true;}
+    clearRecovery();
+}
+void* resolve(const Identity& id) {
+    // Resolve the saved slot before dereferencing a possibly deleted address.
+    if(!id.address)return nullptr;
+    auto item=FUObjectArray::IndexToObject(id.index);
+    return item&&reinterpret_cast<uintptr_t>(item->GetUObject())==id.address&&
+        FUObjectArray::IsValid(item,false)&&item->GetSerialNumber()==id.serial?item->GetUObject():nullptr;
+}
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
     cameraInitialized=false;
-    nativeCamera=false;clearTracking();
+    nativeCamera=false;clearTracking();clearRecovery();
     cameraOwner.store(nullptr,std::memory_order_release);
     ownerId={};castLockId={};assistTargetId={};pendingId={};dwell.clear();nextFallback=false;assistScale=1;assistAt=0;playerLocked=false;clearAttackPending=true;
     for(auto& x:session.watched)x.store(-1,std::memory_order_relaxed);
@@ -114,6 +136,7 @@ void syncSession() {
     if(mask&4){assistTargetId={};assistScale=1;assistAt=0;session.watched[2]=-1;}
     if(mask&8){pendingId={};dwell.clear();session.watched[3]=-1;}
     if(mask&48)clearTracking();
+    if(mask&192)abandonRecovery();
 }
 bool live(){return active.load(std::memory_order_relaxed)&&GetCurrentThreadId()==gameThread;}
 bool sameCurrent(void* object,const Identity& id){return id.address && identity(object)==id;}
@@ -138,7 +161,7 @@ bool managed(void* combat,bool cameraContext=false) {
     auto pawn=field<void*>(combat,0xa8);
     if(!gameplay(pawn,true)||field<void*>(pawn,0xc90)!=combat){
         auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
-        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();}
+        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();}
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
@@ -170,6 +193,7 @@ using Pick=void*(*)(void*);Pick originalPick{};
 using SetTarget=void(*)(void*,void*);SetTarget originalSetTarget{};
 using Request=void(*)(void*);Request originalRequest{};
 using Lock=void(*)(void*,bool);Lock originalLock{};
+using LoseLock=void(*)(void*,void*,float);LoseLock originalLoseLock{};
 using Script=void(*)(void*,void*,void*);Script originalLockScript{},originalSwitchScript{};
 using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
 SetTarget originalAttackTarget{};
@@ -186,11 +210,15 @@ thread_local bool automaticRequest{};
 thread_local bool fallbackRequest{};
 thread_local bool inRequest{};
 thread_local void* lockButton{};
+struct TemporaryLoss {void* combat;float duration;};
+thread_local const TemporaryLoss* temporaryLoss{};
+thread_local void* recovering{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
     uint64_t lockChanges{},blockedTargets{};
     uint64_t cameraDirections{},directionFallbacks{},directionMicros{};
     uint64_t trackingAttempts{},trackingSteps{},trackingMoves{},trackingInput{},trackingMicros{};
+    uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -213,6 +241,8 @@ void report(uint64_t now) {
         L" trackingUnavailable="+std::to_wstring(metrics.trackingAttempts-metrics.trackingSteps)+
         L" trackingMoves="+std::to_wstring(metrics.trackingMoves)+L" trackingInput="+std::to_wstring(metrics.trackingInput)+
         L" trackingUs="+std::to_wstring(metrics.trackingMicros)+
+        L" temporaryLosses="+std::to_wstring(metrics.temporaryLosses)+L" targetRecoveries="+std::to_wstring(metrics.targetRecoveries)+
+        L" recoveryMisses="+std::to_wstring(metrics.recoveryMisses)+
         L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
@@ -232,12 +262,13 @@ void smoothView(void* camera,float delta,Vec3* view,Vec3* input) {
     auto combat=reinterpret_cast<void*>(ownerId.address);
     if(!sameCurrent(combat,ownerId)||!managed(combat)||!playerLocked||
        !(field<uint8_t>(combat,0x8e)&0x10)||!view||!input||!finite(*view)||!finite(*input)){
-        clearTracking();return;
+        clearTracking();abandonRecovery();return;
     }
     auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
     if(field<void*>(pc,0x370)!=camera||field<void*>(camera,0)!=at<void*>(Build::PlayerCameraVtable)){
         clearTracking();return;
     }
+    if(recoveryRemaining&&(input->x!=0.0||input->y!=0.0)){recoveryHadLook=true;recoveryLookAt=GetTickCount64();}
     auto target=field<void*>(combat,0x1380);
     const auto targetId=identity(target);
     if(!targetId.address){clearTracking();return;}
@@ -308,7 +339,7 @@ void updateAssist(void* combat,uint64_t now) {
 }
 void request(void* combat) {
     syncSession();
-    if(inRequest||!settings.targeting||!eligible(combat))return;
+    if(inRequest||!settings.targeting||recoveryRemaining||!eligible(combat))return;
     auto config=field<void*>(combat,0x9b8);if(!config)return;
     float parameter=field<float>(config,0x26c);
     if(!std::isfinite(parameter)||parameter<=0||parameter>=1000000)return;
@@ -324,6 +355,7 @@ void request(void* combat) {
     if(settings.debugLogging)metrics.micros+=clockMicros()-before;
 }
 void clearTarget(void* combat) {
+    clearRecovery();
     if(trackingTargetId.address)clearTracking();
     // The native setter removes delegates and publishes the target change.
     if(field<void*>(combat,0x1380)){originalSetTarget(combat,nullptr);clearAttackPending=true;}
@@ -334,6 +366,14 @@ void clearTarget(void* combat) {
 void tick(void* pawn,float delta) {
     auto combat=live()&&pawn?field<void*>(pawn,0xc90):nullptr;
     if(managed(combat)){
+        if(recoveryRemaining){
+            // Native recovery timers use gameplay time, including time dilation.
+            // Only an outstanding loss adds this scalar watchdog work.
+            if(!std::isfinite(delta)||delta<0||delta>=recoveryRemaining){
+                if(settings.debugLogging)++metrics.recoveryMisses;
+                abandonRecovery();
+            }else recoveryRemaining-=delta;
+        }
         if(!(field<uint8_t>(combat,0x8e)&0x10)&&playerLocked){playerLocked=false;clearAttackPending=true;}
         if(!playerLocked)clearTarget(combat);
     }
@@ -351,7 +391,33 @@ void tick(void* pawn,float delta) {
     if(settings.debugLogging)report(GetTickCount64());
 }
 bool switchTarget(void* combat,uint8_t mode,float distance,bool a,bool b,bool c,bool d,bool e) {
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
     if(!managed(combat))return originalSwitch(combat,mode,distance,a,b,c,d,e);
+    if(caller==Build::RegainLockReturn&&recoveryRemaining){
+        const auto targetId=recoveryTargetId,actorId=recoveryActorId;
+        auto target=resolve(targetId),actor=resolve(actorId);
+        const auto now=GetTickCount64(),lastLook=recoveryLookAt;const bool hadLook=recoveryHadLook;
+        if(settings.cameraMode!=1||!eligible(combat)||
+           field<void*>(combat,0x1380)||!target||!actor||field<void*>(target,0xa8)!=actor){
+            if(settings.debugLogging)++metrics.recoveryMisses;
+            abandonRecovery();return false;
+        }
+        // Let the native switch build its in-range candidate list and validate
+        // this one enemy. Its regain event is the only off-cone exception.
+        const auto oldSelecting=selecting,oldRecovering=recovering;const bool wasRequest=inRequest;
+        selecting=combat;recovering=actor;inRequest=true;
+        originalSwitch(combat,2,distance,false,false,false,false,false);
+        selecting=oldSelecting;recovering=oldRecovering;inRequest=wasRequest;
+        const bool restored=recoveryTargetId==targetId&&recoveryActorId==actorId&&
+            field<void*>(combat,0x1380)==target&&resolve(targetId)&&resolve(actorId);
+        if(restored){
+            clearRecovery();clearTracking();trackingTargetId=targetId;trackingActorId=actorId;
+            session.watched[4]=targetId.index;session.watched[5]=actorId.index;
+            tracking.quiet=hadLook?(now>=lastLook?(now-lastLook)*0.001:0):settings.trackingResumeMs*0.001;
+            if(settings.debugLogging)++metrics.targetRecoveries;
+        }else{if(settings.debugLogging)++metrics.recoveryMisses;abandonRecovery();}
+        return restored;
+    }
     // Native look/next/previous and threat/ability reacquisition never get to
     // replace a manual selection or create an unlocked soft target.
     if(lockButton!=combat)return false;
@@ -389,6 +455,16 @@ void* pick(void* context) {
     field<void*>(context,0x50)=nullptr;
     field<uint8_t>(context,0x61)=1;field<uint8_t>(context,0x62)=2;
     field<uint8_t>(context,0x63)=0;field<uint8_t>(context,0x64)=1;field<uint8_t>(context,0x65)=0;
+    if(recovering){
+        // No search outside the native distance-filtered list, and no substitute
+        // enemy if the remembered one is dead, unavailable or occluded.
+        bool present=false;for(int i=0;i<candidates->size;++i)if(candidates->data[i]==recovering){present=true;break;}
+        if(!present)return nullptr;
+        void* actor=recovering;List singleton{&actor,1,1};field<List*>(context,0x58)=&singleton;
+        field<uint8_t>(context,0x61)=0; // Verified native angular-rejection gate only.
+        if(settings.debugLogging)++metrics.dwellChecks;
+        return originalPick(context)==actor?actor:nullptr;
+    }
     List waiting{&previous,1,1};
     if(retainOnly){field<List*>(context,0x58)=&waiting;if(settings.debugLogging)++metrics.dwellChecks;}
     else if(settings.debugLogging){++metrics.pickCalls;metrics.candidates+=candidates->size;}
@@ -409,12 +485,31 @@ void setTarget(void* combat,void* target) {
     const bool local=managed(combat);
     if(local){
         if(target&&(!playerLocked||selecting!=combat)){if(settings.debugLogging)++metrics.blockedTargets;return;}
+        const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
+        bool temporary=false;
+        if(!target&&playerLocked&&settings.cameraMode==1&&temporaryLoss&&temporaryLoss->combat==combat&&caller==Build::LoseLockClearReturn){
+            auto previous=field<void*>(combat,0x1380);const auto id=identity(previous);
+            auto actor=id.address?field<void*>(previous,0xa8):nullptr;const auto actorId=identity(actor);
+            const float duration=temporaryLoss->duration;
+            if(id.address&&actorId.address&&std::isfinite(duration)&&duration>0&&duration<=60){
+                clearRecovery();recoveryTargetId=id;recoveryActorId=actorId;
+                recoveryRemaining=duration+1.0;
+                session.watched[6]=id.index;session.watched[7]=actorId.index;temporary=true;
+                if(settings.debugLogging)++metrics.temporaryLosses;
+            }
+        }
+        if((target&&!recovering)||(!target&&!temporary&&field<void*>(combat,0x1380)))clearRecovery();
         // Losing a manual target returns to untargeted combat. Camera targeting
         // keeps the player's request and may find another enemy on its budget.
-        if(!target&&!settings.targeting&&field<void*>(combat,0x1380)){playerLocked=false;clearAttackPending=true;}
+        if(!target&&!temporary&&!settings.targeting&&field<void*>(combat,0x1380)){playerLocked=false;clearAttackPending=true;}
     }
     originalSetTarget(combat,target);
     if(local){if(!target)clearTracking();managed(combat,true);}
+}
+void loseLock(void* combat,void* target,float duration) {
+    const TemporaryLoss loss{combat,duration};const auto previous=temporaryLoss;
+    temporaryLoss=live()&&settings.cameraMode==1?&loss:nullptr;
+    originalLoseLock(combat,target,duration);temporaryLoss=previous;
 }
 void nativeRequest(void* combat) {
     if(managed(combat)){request(combat);return;}
@@ -595,7 +690,7 @@ void configure(Settings value) {
     cameraMetrics.viewChecks=0;cameraMetrics.viewOtherThread=0;
     // The first nine ABI values and legacy freeCamera key remain readable.
     // Camera/targeting Apply preserves the explicit lock-button choice.
-    if(cameraChanged){cameraInitialized=false;clearTracking();}
+    if(cameraChanged){cameraInitialized=false;clearTracking();clearRecovery();}
     if(!settings.enabled)clearSession();
     dwell.clear();nextFallback=false;assistScale=1;assistAt=0;
     metrics={};active=installed.load()&&settings.enabled&&inputSupported;
@@ -627,6 +722,7 @@ bool start(std::wstring& error) {
         hook(Build::Tick,&tick,originalTick);hook(Build::Switch,&switchTarget,originalSwitch);
         hook(Build::Picker,&pick,originalPick);hook(Build::SetTarget,&setTarget,originalSetTarget);
         hook(Build::Request,&nativeRequest,originalRequest);hook(Build::Lock,&lockTarget,originalLock);
+        hook(Build::LoseLock,&loseLock,originalLoseLock);
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);

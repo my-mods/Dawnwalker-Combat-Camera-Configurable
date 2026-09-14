@@ -1,1 +1,1 @@
-Choose Free, Smooth tracking or Native tracking for combat. Smooth follows locked enemies gently, with adjustable speed and a pause after manual camera movement. Supports camera-directed targeting, fixed enemy selection and untargeted combat.
+Choose Free Camera, Smooth Tracking or Native Tracking independently of target selection. Smooth tracking gently follows locked enemies, yields to manual camera movement, and resumes after an adjustable delay. Set its tracking strength in Mod Setting Menu.

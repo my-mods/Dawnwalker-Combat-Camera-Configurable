@@ -4,13 +4,14 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 
 [Download on Nexus Mods](https://www.nexusmods.com/thebloodofdawnwalker/mods/480)
 
-- Keep the camera free, gently follow a locked enemy, or use native tracking. Free is the default.
-- Smooth tracking follows horizontally and vertically, yields to mouse/right-stick movement, and resumes after an adjustable pause. Tune its speed separately from controller aim slowdown.
+- **Free Camera:** Move the camera yourself, with no automatic enemy tracking. This is the default.
+- **Smooth Tracking Camera:** Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength.
+- **Native Tracking Camera:** Use the game's normal target tracking speed.
 - Fight without a selected target until you press the normal target-lock button. Unlocked attacks follow the camera's horizontal heading even when the character faces elsewhere. Blocking keeps the game's incoming-direction checks.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
 - Add optional controller aim slowdown during camera-directed targeting. Fixed-target and untargeted modes keep full camera sensitivity. Mouse movement is excluded.
-- Choose the targeting behavior, center dot and slowdown in Mod Setting Menu and press **Apply**. Preferences are saved for subsequent launches.
+- Choose camera behavior, tracking strength, resume delay, target selection, center dot and slowdown in Mod Setting Menu and press **Apply**. Preferences are saved for subsequent launches.
 
 ## Requirements
 

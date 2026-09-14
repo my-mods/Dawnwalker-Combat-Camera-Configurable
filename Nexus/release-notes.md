@@ -1,15 +1,10 @@
-# Combat Camera - Configurable 1.0.0
+# Combat Camera - Configurable 2.0.0
 
-- Unlocked attacks follow the camera's horizontal heading even when the character is facing another direction, without selecting an enemy.
-- Prevent lock-on, spells and combat actions from reattaching the camera, preserving the selected enemy without recurring detachment repairs.
-- The normal target-lock button toggles untargeted combat and targeted combat.
-- Camera-directed targeting selects automatic camera targeting or a fixed enemy while locked.
-- The camera stays free in every targeting state, including when Camera-directed targeting is Off.
-- Unlocked combat suppresses automatic target acquisition and target-based attack alignment while retaining directional defense checks.
-- Stick and mouse movement no longer cycle a fixed target; unlock and lock again to choose another enemy.
-- Applying targeting settings preserves the current lock state.
-- Optional native HUD center dot, set to Off by default, and adjustable controller aim slowdown.
-- Persistent Mod Setting Menu settings with immediate Apply.
-- Shared 50 ms interval for automatic target searches and optional aggregate logging.
-- Corrected native settings argument handling so Center dot Off and the other controls apply independently.
-- Unregisters the object-deletion listener during shutdown.
+- Add three combat modes: camera-directed targeting, fixed enemy selection, and untargeted combat.
+- Keep the camera free in every mode, including manual lock-on, spells and combat actions.
+- Use the normal target-lock button to enter or leave targeting. Camera-directed targeting chooses automatic or fixed selection while locked.
+- Aim unlocked attacks along the camera's horizontal heading, even when the character faces elsewhere.
+- Stop automatic enemy selection while unlocked and retain the game's incoming-direction blocking checks.
+- Keep the chosen enemy in fixed-target mode. Stick and mouse movement control the camera; unlock, aim and lock again to choose another enemy.
+- Preserve the current lock state when applying targeting settings.
+- Make camera freedom part of Enable mod and remove the separate Free combat camera setting.

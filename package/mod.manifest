@@ -3,9 +3,9 @@
   <info>
     <name>Combat Camera - Configurable</name>
     <modid>CombatCamera</modid>
-    <description>Free combat camera, camera-directed targeting, optional center dot and controller aim slowdown, with persistent Mod Setting Menu controls.</description>
+    <description>Free camera in camera-directed, fixed-target and untargeted combat. Aim unlocked attacks with the camera and configure the behavior in Mod Setting Menu.</description>
     <author>my-mods</author>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <created_on>2026-09-13</created_on>
   </info>
   <supports><game>The Blood of Dawnwalker</game><steam_build>25232147</steam_build><loader>Framecore 2b</loader></supports>

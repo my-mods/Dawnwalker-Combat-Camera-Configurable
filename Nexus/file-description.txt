@@ -1,1 +1,1 @@
-Free combat camera with untargeted attacks and directional blocking, camera-directed targeting or fixed enemy selection. Use your normal target-lock binding and configure the behavior in Mod Setting Menu.
+Three combat modes with a free camera: camera-directed targeting, fixed enemy selection, and untargeted combat. Unlocked attacks follow camera aim, while blocking keeps directional checks. Includes Mod Setting Menu controls, an optional center dot and controller aim slowdown.

@@ -7,20 +7,20 @@
     "modId": 480,
     "fileId": 1795
   },
-  "version": "1.0.0",
+  "version": "2.0.0",
   "category": "Gameplay",
   "author": "my-mods",
-  "summary": "Free camera in untargeted, camera-directed and fixed-target combat. Use your normal lock button to enable targeting, and choose automatic or fixed selection in Mod Setting Menu. Includes an optional center dot and controller slowdown.",
+  "summary": "Free the combat camera in all three modes: camera-directed targeting, fixed enemy selection, and untargeted combat. Toggle targeting with your normal lock button. When unlocked, attack toward the camera and block by the incoming attack direction.",
   "tags": [
     "Gameplay",
     "Quality of Life",
-    "AI generated",
+    "AI-Generated Content",
     "AI Media"
   ],
   "file": {
     "displayName": "Combat Camera - Configurable",
     "filename": "Combat-Camera-Configurable.zip",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "category": "Main",
     "modManagerDownload": true
   },

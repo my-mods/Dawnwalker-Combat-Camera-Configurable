@@ -1,15 +1,15 @@
 [size=5][b][color=#E8C88A]Combat Camera - Configurable[/color][/b][/size]
 
-Move the camera freely during combat and select enemies by looking toward them. Adjust the behavior in Mod Setting Menu, press Apply, and keep your choices across save loads and game launches.
+Keep the camera free in untargeted combat, camera-directed targeting and fixed-target combat. Adjust the behavior in Mod Setting Menu, press Apply, and keep your choices across save loads and game launches.
 
 [size=4][b][color=#E8C88A]Features[/color][/b][/size]
 
 [list]
-[*][b][color=#A8D5C2]Free combat camera:[/color][/b] Look around during combat. Manual lock-on retains the normal locked camera.
-[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] Aim the camera toward an enemy to select them. Adjust the selection cone and the delay before switching targets. Committed combat actions retain priority.
+[*][b][color=#A8D5C2]Free combat camera:[/color][/b] Look around freely with target lock on or off. The normal target-lock button toggles targeting without attaching the camera to an enemy.
+[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] While target lock is active, On selects enemies toward the camera and Off keeps the selected enemy. Adjust the cone and automatic switch delay. With target lock off, enemies are never automatically selected.
 [*][b][color=#A8D5C2]Optional center dot:[/color][/b] Choose Off, Weapon drawn, or Always in gameplay. Off is the default. The dot uses the game's HUD and hides during menus, cinematics and loading.
-[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] Reduce right-stick camera sensitivity near your current target, with adjustable strength. It does not steer the camera, and mouse movement is excluded.
-[*][b][color=#A8D5C2]Saved settings:[/color][/b] Toggle the camera, targeting and slowdown independently. Mod Setting Menu changes take effect when you press Apply and are restored on the next launch.
+[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] Reduce right-stick camera sensitivity near your target during camera-directed targeting, with adjustable strength. Fixed-target and untargeted modes keep full sensitivity. It does not steer the camera, and mouse movement is excluded.
+[*][b][color=#A8D5C2]Saved settings:[/color][/b] Choose the targeting behavior, center dot and slowdown. Mod Setting Menu changes take effect when you press Apply and are restored on the next launch.
 [/list]
 
 [size=4][b][color=#E8C88A]Installation[/color][/b][/size]
@@ -25,8 +25,7 @@ Open Mod Settings, select [b]Combat Camera - Configurable[/b], adjust the contro
 
 [list]
 [*][b][color=#A8D5C2]Enable mod:[/color][/b] On by default.
-[*][b][color=#A8D5C2]Free combat camera:[/color][/b] On by default.
-[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On selects enemies toward the camera while locked. Off retains your chosen enemy. The camera stays free in both cases.
 [*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.
 [*][b][color=#A8D5C2]Targeting cone:[/color][/b] 45° from the camera axis by default; adjustable from 1° to 90°. Set 0 to use the native cone.
 [*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.
@@ -37,7 +36,9 @@ Open Mod Settings, select [b]Combat Camera - Configurable[/b], adjust the contro
 
 [size=4][b][color=#E8C88A]Targeting behavior[/color][/b][/size]
 
-Automatic targeting shares a 50 ms minimum interval between full native selection passes. A fallback search waits until the next interval, while a single-target validity check can retain the current target. The game still handles eligibility, visibility and combat targeting rules. Settings are read at startup and updated through Apply, without repeated INI polling.
+Use R3 / right-stick click or your configured target-lock binding to toggle targeting. With no target lock, attacks use the untargeted forward direction and blocking keeps the game's incoming-direction checks. In fixed-target mode, unlock, look toward another enemy and lock again to change targets. Stick and mouse movement remain camera controls. Applying the targeting setting preserves the current lock state.
+
+Automatic targeting runs only while target lock and Camera-directed targeting are both on. It shares a 50 ms minimum interval between full native selection passes. A fallback search waits until the next interval, while a single-target validity check can retain the current target. The game still handles eligibility, visibility and combat targeting rules. Settings are read at startup and updated through Apply, without repeated INI polling.
 
 [size=4][b][color=#E8C88A]Credits and source[/color][/b][/size]
 

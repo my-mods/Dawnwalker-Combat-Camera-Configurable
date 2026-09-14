@@ -12,7 +12,7 @@
   {
     "type": "attribute",
     "key": "description",
-    "value": "Free combat camera, camera-directed targeting, center dot and controller aim slowdown with persistent Mod Setting Menu controls."
+    "value": "Free camera with untargeted, camera-directed or fixed-target combat, configured through Mod Setting Menu."
   },
   {
     "type": "attribute",

@@ -1,1 +1,1 @@
-Free combat camera, camera-directed targeting, an optional center dot set to Off by default, and controller aim slowdown. Includes persistent Mod Setting Menu controls and immediate Apply.
+Free combat camera with untargeted attacks and directional blocking, camera-directed targeting or fixed enemy selection. Use your normal target-lock binding and configure the behavior in Mod Setting Menu.

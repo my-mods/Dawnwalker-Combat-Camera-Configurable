@@ -10,7 +10,7 @@
   "version": "1.0.0",
   "category": "Gameplay",
   "author": "my-mods",
-  "summary": "Free combat camera and camera-directed targeting with persistent Mod Setting Menu controls. Adjust target switching, targeting angle, an optional center dot (Off by default), and controller aim slowdown.",
+  "summary": "Free camera in untargeted, camera-directed and fixed-target combat. Use your normal lock button to enable targeting, and choose automatic or fixed selection in Mod Setting Menu. Includes an optional center dot and controller slowdown.",
   "tags": [
     "Gameplay",
     "Quality of Life",

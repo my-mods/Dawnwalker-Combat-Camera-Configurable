@@ -1,10 +1,13 @@
 ; Windows x64 mid-function gates. All volatile registers and XMM values are
-; preserved across the C++ predicate. Both verified sites have 16-byte RSP.
+; preserved across the C++ predicate. All three verified sites have 16-byte RSP.
 EXTERN ShouldFreeCamera:PROC
 EXTERN Threshold:PROC
+EXTERN ShouldUseFreeDirection:PROC
 EXTERN CameraOriginal:QWORD
 EXTERN CameraContinue:QWORD
 EXTERN ConeContinue:QWORD
+EXTERN ForwardOriginal:QWORD
+EXTERN ForwardContinue:QWORD
 .code
 SAVE_STATE MACRO
     pushfq
@@ -79,4 +82,18 @@ ConeGate PROC FRAME
     RESTORE_STATE
     jmp QWORD PTR [ConeContinue]
 ConeGate ENDP
+ForwardGate PROC FRAME
+    SAVE_STATE
+    mov rcx, rdi
+    call ShouldUseFreeDirection
+    test al, al
+    jz vanilla_direction
+    RESTORE_STATE
+    ; The game has already calculated its normalized planar forward vector.
+    ; Use its existing no-target result, bypassing both combat/action targets.
+    jmp QWORD PTR [ForwardContinue]
+vanilla_direction:
+    RESTORE_STATE
+    jmp QWORD PTR [ForwardOriginal]
+ForwardGate ENDP
 END

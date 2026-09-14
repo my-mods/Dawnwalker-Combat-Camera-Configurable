@@ -19,9 +19,10 @@
 #include "GameBuild.hpp"
 
 extern "C" {
-    void CameraGate(); void ConeGate();
+    void CameraGate(); void ConeGate(); void ForwardGate();
     void* CameraOriginal{}; void* CameraContinue{};
     void* ConeContinue{};
+    void* ForwardOriginal{}; void* ForwardContinue{};
 }
 namespace CombatCamera {
 namespace {
@@ -35,8 +36,9 @@ std::atomic_bool active{},installed{};
 Settings settings;
 DWORD gameThread{};
 bool attempted{};
+bool inputSupported{true};
 std::wstring startError;
-std::array<void*,12> hooked{};size_t hookCount{};
+std::array<void*,20> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -72,9 +74,11 @@ void Session::OnUObjectArrayShutdown() {
 Identity ownerId,castLockId,assistTargetId,pendingId;
 Dwell dwell;
 bool nextFallback{};
+bool playerLocked{};
+bool clearAttackPending{true};
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
-    ownerId={};castLockId={};assistTargetId={};pendingId={};dwell.clear();nextFallback=false;assistScale=1;assistAt=0;
+    ownerId={};castLockId={};assistTargetId={};pendingId={};dwell.clear();nextFallback=false;assistScale=1;assistAt=0;playerLocked=false;clearAttackPending=true;
     for(auto& x:session.watched)x.store(-1,std::memory_order_relaxed);
 }
 void syncSession() {
@@ -98,21 +102,31 @@ int gameplay(void* pawn) {
     if(action==10||action==11)return 0;
     return (field<uint8_t>(combat,0x8e)&0x10)&&field<uint8_t>(combat,0xdb8)<=2&&field<uint8_t>(combat,0xdbc)==0?2:1;
 }
-bool manualLocked(void* combat) {
-    return field<uint8_t>(combat,0x14a9)!=0&&!sameCurrent(combat,castLockId);
+bool managed(void* combat) {
+    if(!live()||!combat)return false;
+    if(field<void*>(combat,0)!=at<void*>(Build::PlayerCombatVtable))return false;
+    syncSession();
+    auto pawn=field<void*>(combat,0xa8);
+    if(!gameplay(pawn)||field<void*>(pawn,0xc90)!=combat)return false;
+    auto id=identity(combat);if(!id.address)return false;
+    if(id!=ownerId){clearSession();ownerId=id;session.watched[0]=id.index;}
+    return true;
 }
 bool eligible(void* combat) {
-    if(!combat||!gameplay(field<void*>(combat,0xa8))||!(field<uint8_t>(combat,0x8e)&0x10)||
-       field<uint8_t>(combat,0x1612)||manualLocked(combat))return false;
+    if(!managed(combat)||!playerLocked||!(field<uint8_t>(combat,0x8e)&0x10)||
+       field<uint8_t>(combat,0x1612))return false;
     auto action=field<uint8_t>(combat,0xb28);
     return action!=1&&action!=2&&action!=10&&action!=11&&action!=12;
 }
 using Tick=void(*)(void*,float);Tick originalTick{};
-using Switch=void(*)(void*,uint8_t,float,bool,bool,bool,bool,bool);Switch originalSwitch{};
+using Switch=bool(*)(void*,uint8_t,float,bool,bool,bool,bool,bool);Switch originalSwitch{};
 using Pick=void*(*)(void*);Pick originalPick{};
 using SetTarget=void(*)(void*,void*);SetTarget originalSetTarget{};
 using Request=void(*)(void*);Request originalRequest{};
 using Lock=void(*)(void*,bool);Lock originalLock{};
+using Script=void(*)(void*,void*,void*);Script originalLockScript{},originalSwitchScript{};
+using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
+SetTarget originalAttackTarget{};
 using Draw=void(*)(void*);Draw originalDraw{};
 struct InputValue{Vec3 value;int type;int padding;};static_assert(sizeof(InputValue)==32);
 using Modify=InputValue*(*)(void*,InputValue*,void*,const InputValue*,float);Modify originalModify{};
@@ -124,8 +138,10 @@ thread_local void* coneContext{};
 thread_local bool automaticRequest{};
 thread_local bool fallbackRequest{};
 thread_local bool inRequest{};
+thread_local void* lockButton{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},camera{},draw{},assist{},ticks{},micros{};
+    uint64_t lockChanges{},blockedTargets{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -137,6 +153,8 @@ void report(uint64_t now) {
         L" candidates="+std::to_wstring(metrics.candidates)+L" dwellChecks="+std::to_wstring(metrics.dwellChecks)+
         L" budgetSkips="+std::to_wstring(metrics.skipped)+L" camera="+std::to_wstring(metrics.camera)+
         L" crosshair="+std::to_wstring(metrics.draw)+L" assist="+std::to_wstring(metrics.assist)+
+        L" lockChanges="+std::to_wstring(metrics.lockChanges)+L" blockedTargets="+std::to_wstring(metrics.blockedTargets)+
+        L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
 }
@@ -146,7 +164,7 @@ Vec3 cameraVector(void* camera,size_t slot) {
 }
 void updateAssist(void* combat,uint64_t now) {
     assistScale=1;assistTargetId={};assistAt=0;session.watched[2]=-1;
-    if(!settings.aimAssist||!settings.assistStrength)return;
+    if(!playerLocked||!settings.targeting||!settings.aimAssist||!settings.assistStrength)return;
     auto targetComponent=field<void*>(combat,0x1380);
     if(!targetComponent)return;
     auto target=field<void*>(targetComponent,0xa8),pawn=field<void*>(combat,0xa8);
@@ -162,14 +180,13 @@ void updateAssist(void* combat,uint64_t now) {
 }
 void request(void* combat) {
     syncSession();
-    if(inRequest||!eligible(combat))return;
+    if(inRequest||!settings.targeting||!eligible(combat))return;
     auto config=field<void*>(combat,0x9b8);if(!config)return;
     float parameter=field<float>(config,0x26c);
     if(!std::isfinite(parameter)||parameter<=0||parameter>=1000000)return;
     const auto now=GetTickCount64();
     if(!requestBudget.take(now)){if(settings.debugLogging)++metrics.skipped;return;}
     auto id=identity(combat);if(!id.address)return;
-    if(id!=ownerId){auto cast=castLockId;clearSession();ownerId=id;session.watched[0]=id.index;if(cast==id){castLockId=cast;session.watched[1]=id.index;}}
     inRequest=true;automaticRequest=true;fallbackRequest=nextFallback;nextFallback=false;auto previous=selecting;selecting=combat;
     uint64_t before=settings.debugLogging?clockMicros():0;
     if(settings.debugLogging)++metrics.requests;
@@ -178,23 +195,47 @@ void request(void* combat) {
     updateAssist(combat,now);
     if(settings.debugLogging)metrics.micros+=clockMicros()-before;
 }
+void clearTarget(void* combat) {
+    // The native setter removes delegates and publishes the target change.
+    if(field<void*>(combat,0x1380)){originalSetTarget(combat,nullptr);clearAttackPending=true;}
+    if(clearAttackPending){originalAttackTarget(combat,nullptr);clearAttackPending=false;}
+    if((field<uint8_t>(combat,0x14a9)!=0)!=playerLocked)originalLock(combat,playerLocked);
+    assistScale=1;assistAt=0;dwell.clear();nextFallback=false;
+}
 void tick(void* pawn,float delta) {
+    auto combat=live()&&pawn?field<void*>(pawn,0xc90):nullptr;
+    if(managed(combat)){
+        if(!(field<uint8_t>(combat,0x8e)&0x10)&&playerLocked){playerLocked=false;clearAttackPending=true;}
+        if(!playerLocked)clearTarget(combat);
+    }
     originalTick(pawn,delta);
     if(!live())return;
     syncSession();
-    auto combat=field<void*>(pawn,0xc90);
+    combat=field<void*>(pawn,0xc90);
+    if(managed(combat)&&!playerLocked)clearTarget(combat);
     if(settings.targeting && gameplay(pawn))request(combat);
-    else if(settings.aimAssist&&eligible(combat)){
+    else if(settings.targeting&&settings.aimAssist&&eligible(combat)){
         auto now=GetTickCount64();if(assistBudget.take(now))updateAssist(combat,now);
     }else{assistScale=1;dwell.clear();}
     if(settings.debugLogging)report(GetTickCount64());
 }
-void switchTarget(void* combat,uint8_t mode,float distance,bool a,bool b,bool c,bool d,bool e) {
-    if(live())syncSession();
-    auto previous=selecting;
-    if(live()&&settings.targeting&&eligible(combat))selecting=combat;
-    originalSwitch(combat,mode,distance,a,b,c,d,e);
-    selecting=previous;
+bool switchTarget(void* combat,uint8_t mode,float distance,bool a,bool b,bool c,bool d,bool e) {
+    if(!managed(combat))return originalSwitch(combat,mode,distance,a,b,c,d,e);
+    // Native look/next/previous and threat/ability reacquisition never get to
+    // replace a manual selection or create an unlocked soft target.
+    if(lockButton!=combat)return false;
+    lockButton=nullptr;
+    playerLocked=!playerLocked;
+    if(settings.debugLogging)++metrics.lockChanges;
+    clearAttackPending=!playerLocked;
+    if(!playerLocked){clearTarget(combat);return false;}
+    originalLock(combat,true);
+    auto previous=selecting;const auto wasRequest=inRequest;inRequest=true;
+    selecting=combat;
+    const auto result=originalSwitch(combat,2,distance,false,false,false,false,false);
+    selecting=previous;inRequest=wasRequest;
+    if(!field<void*>(combat,0x1380)&&!settings.targeting){playerLocked=false;originalLock(combat,false);}
+    return result;
 }
 struct List{void** data;int size,capacity;};static_assert(sizeof(List)==16);
 void* pick(void* context) {
@@ -234,24 +275,66 @@ void* pick(void* context) {
     return originalPick(context)?previous:chosen;
 }
 void setTarget(void* combat,void* target) {
-    auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
-    if(live()&&settings.targeting&&caller==Build::AutoSetReturn&&target&&eligible(combat)){request(combat);return;}
+    if(managed(combat)){
+        if(target&&(!playerLocked||selecting!=combat)){if(settings.debugLogging)++metrics.blockedTargets;return;}
+        // Losing a manual target returns to untargeted combat. Camera targeting
+        // keeps the player's request and may find another enemy on its budget.
+        if(!target&&!settings.targeting&&field<void*>(combat,0x1380)){playerLocked=false;clearAttackPending=true;}
+    }
     originalSetTarget(combat,target);
 }
 void nativeRequest(void* combat) {
-    auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
-    if(live()&&settings.targeting&&caller==Build::AutoRequestReturn&&eligible(combat)){request(combat);return;}
+    if(managed(combat)){request(combat);return;}
     originalRequest(combat);
 }
 void lockTarget(void* combat,bool locked) {
-    if(live()){
-        syncSession();
-        auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
-        if(locked&&caller==Build::CastingLockReturn&&!field<uint8_t>(combat,0x14a9)){
-            castLockId=identity(combat);session.watched[1]=castLockId.index;
-        }else if(sameCurrent(combat,castLockId)){castLockId={};session.watched[1]=-1;}
+    if(managed(combat)){
+        if(lockButton==combat){
+            // Consume the input once, including recursive native clear calls.
+            lockButton=nullptr;playerLocked=!playerLocked;
+            clearAttackPending=!playerLocked;
+            if(settings.debugLogging)++metrics.lockChanges;
+            if(!playerLocked)clearTarget(combat);
+        }
+        locked=playerLocked;
     }
     originalLock(combat,locked);
+}
+bool fromLockButton(void* combat,void* frame,uintptr_t offset) {
+    if(!managed(combat)||!frame)return false;
+    // UE 5.5 FFrame and UStruct::Script layouts, checked against this build.
+    // These two exact bytecode calls belong to IA_Combat_LockTarget. The native
+    // thunks still decode all parameters and advance the VM normally.
+    auto node=field<void*>(frame,0x10),pawn=field<void*>(combat,0xa8);
+    if(!node||field<void*>(frame,0x18)!=pawn||field<uint64_t>(node,0x18)!=Build::playerGraphName)return false;
+    auto outer=field<void*>(node,0x20);
+    if(!outer||field<uint64_t>(outer,0x18)!=Build::playerClassName)return false;
+    auto script=field<uintptr_t>(node,0x60),code=field<uintptr_t>(frame,0x20);
+    const auto pc=code>=script?code-script:UINTPTR_MAX;
+    if(script&&field<int>(node,0x68)==12194){
+        if(pc==offset)return true;
+        if(offset==0x8a9&&(pc==0x528||pc==0x6ba))return false; // Stock next/previous actions.
+    }
+    // A changed player Blueprint must not leave the player unable to lock.
+    inputSupported=false;active=false;clearSession();
+    RC::Output::send(L"[CombatCamera] Player target-lock input graph differs from the supported build; mod disabled for this session.\n");
+    return false;
+}
+void lockScript(void* combat,void* frame,void* result) {
+    auto previous=lockButton;
+    lockButton=fromLockButton(combat,frame,0x84b)?combat:nullptr;
+    originalLockScript(combat,frame,result);lockButton=previous;
+}
+void switchScript(void* combat,void* frame,void* result) {
+    auto previous=lockButton;
+    lockButton=fromLockButton(combat,frame,0x8a9)?combat:nullptr;
+    originalSwitchScript(combat,frame,result);lockButton=previous;
+}
+bool actionTarget(void* combat) {
+    return managed(combat)&&!playerLocked?false:originalActionTarget(combat);
+}
+void attackTarget(void* combat,void* target) {
+    originalAttackTarget(combat,managed(combat)&&!playerLocked?nullptr:target);
 }
 void draw(void* hud) {
     originalDraw(hud);
@@ -277,7 +360,7 @@ bool querySetting(void* owner,uint8_t id,void* value) {
     return result;
 }
 InputValue* modify(void* modifier,InputValue* result,void* input,const InputValue* value,float delta) {
-    if(!live()||!settings.aimAssist||!settings.assistStrength)return originalModify(modifier,result,input,value,delta);
+    if(!live()||!settings.targeting||!settings.aimAssist||!settings.assistStrength)return originalModify(modifier,result,input,value,delta);
     syncSession();
     auto action=field<void*>(modifier,0x20);
     // Exact action/package FNames are supplied by the startup binding, and are
@@ -322,19 +405,23 @@ template<class Fn> void hook(uintptr_t rva,Fn detour,Fn& original) {
 }
 }
 extern "C" bool ShouldFreeCamera(void* combat) {
-    if(!live()||!settings.freeCamera)return false;
-    syncSession();
-    bool enabled=combat&&gameplay(field<void*>(combat,0xa8))&&!manualLocked(combat);
+    bool enabled=managed(combat);
     if(enabled&&settings.debugLogging)++metrics.camera;
     return enabled;
 }
+extern "C" bool ShouldUseFreeDirection(void* combat) {return managed(combat)&&!playerLocked;}
 extern "C" double Threshold(void* context) {
-    return live()&&settings.targeting&&selecting&&context==coneContext?coneThreshold:Build::nativeCone;
+    return live()&&selecting&&context==coneContext?coneThreshold:Build::nativeCone;
 }
 void configure(Settings value) {
     if(gameThread&&GetCurrentThreadId()!=gameThread)throw std::runtime_error("Settings must be applied on the game thread");
     settings=value;coneThreshold=value.coneDegrees?std::max(Build::nativeCone,std::cos(value.coneDegrees*3.14159265358979323846/180.0)):Build::nativeCone;
-    clearSession();metrics={};active=installed.load()&&settings.enabled;
+    // Applying the targeting setting must preserve the lock-button choice.
+    // freeCamera remains readable for old preference files; camera freedom is
+    // now intrinsic to the enabled mod, in every targeting state.
+    if(!settings.enabled)clearSession();
+    dwell.clear();nextFallback=false;assistScale=1;assistAt=0;
+    metrics={};active=installed.load()&&settings.enabled&&inputSupported;
 }
 void deactivate(){active=false;}
 bool start(std::wstring& error) {
@@ -347,10 +434,12 @@ bool start(std::wstring& error) {
         for(auto& site:Build::guards)if(std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)throw std::runtime_error("Game code differs at a required hook; disable conflicting camera mods");
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's FName constructor, resolved from the exact build. Stores
-        // value IDs only and is called twice, on the game thread, at startup.
+        // value IDs only and is called four times on the game thread at startup.
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::lookName,"IA_Look",1);
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::lookPackageName,"/Game/_Dawnwalker/Player/Input/Actions/Traversal/IA_Look",1);
-        if(!Build::lookName||!Build::lookPackageName)throw std::runtime_error("Look input action names are unavailable");
+        at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::playerGraphName,"ExecuteUbergraph_BP_PlayerCharacter",1);
+        at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::playerClassName,"BP_PlayerCharacter_C",1);
+        if(!Build::lookName||!Build::lookPackageName||!Build::playerGraphName||!Build::playerClassName)throw std::runtime_error("Player input action names are unavailable");
         CameraContinue=at<void*>(Build::CameraResume);ConeContinue=at<void*>(Build::ConeResume);
         hook(Build::Camera,reinterpret_cast<void*>(&CameraGate),CameraOriginal);
         void* unused{};hook(Build::Cone,reinterpret_cast<void*>(&ConeGate),unused);
@@ -359,9 +448,13 @@ bool start(std::wstring& error) {
         hook(Build::Request,&nativeRequest,originalRequest);hook(Build::Lock,&lockTarget,originalLock);
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);
+        hook(Build::LockScript,&lockScript,originalLockScript);hook(Build::SwitchScript,&switchScript,originalSwitchScript);
+        hook(Build::ActionTarget,&actionTarget,originalActionTarget);hook(Build::AttackTarget,&attackTarget,originalAttackTarget);
+        ForwardContinue=at<void*>(Build::FreeDirection);
+        hook(Build::Forward,reinterpret_cast<void*>(&ForwardGate),ForwardOriginal);
         FUObjectArray::AddUObjectDeleteListener(&session);listening=true;
         if(MH_ApplyQueued()!=MH_OK)throw std::runtime_error("Hook activation failed");
-        installed=true;active=settings.enabled;return true;
+        installed=true;active=settings.enabled&&inputSupported;return true;
     }catch(const std::exception& failure){
         auto message=std::string(failure.what());startError.assign(message.begin(),message.end());stop();error=startError;return false;
     }

@@ -1,1 +1,1 @@
-Three combat modes with a free camera: camera-directed targeting, fixed enemy selection, and untargeted combat. Unlocked attacks follow camera aim, while blocking keeps directional checks. Includes Mod Setting Menu controls, an optional center dot and controller aim slowdown.
+Free camera, smooth target tracking or native tracking, independently of camera-directed or fixed-target selection. Adjust smooth tracking speed and its pause after manual camera movement in Mod Setting Menu. Includes camera-directed unlocked attacks, an optional center dot and controller aim slowdown.

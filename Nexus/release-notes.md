@@ -1,3 +1,9 @@
+## Unreleased
+
+- Add Free, Smooth tracking and Native tracking camera behaviors.
+- Add adjustable smooth tracking speed and resume delay after manual camera movement.
+- Follow locked enemies horizontally and vertically while retaining independent target selection.
+
 # Combat Camera - Configurable 2.0.0
 
 - Add three combat modes: camera-directed targeting, fixed enemy selection, and untargeted combat.

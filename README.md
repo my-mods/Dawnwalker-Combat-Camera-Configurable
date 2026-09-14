@@ -1,10 +1,11 @@
 # Combat Camera - Configurable
 
-Free camera control during combat in **The Blood of Dawnwalker**, with untargeted combat, camera-directed targeting or a fixed enemy selection.
+Choose free camera, smooth target tracking or native tracking during combat in **The Blood of Dawnwalker**, with untargeted combat, camera-directed targeting or a fixed enemy selection.
 
 [Download on Nexus Mods](https://www.nexusmods.com/thebloodofdawnwalker/mods/480)
 
-- Keep the camera free with targeting on or off.
+- Keep the camera free, gently follow a locked enemy, or use native tracking. Free is the default.
+- Smooth tracking follows horizontally and vertically, yields to mouse/right-stick movement, and resumes after an adjustable pause. Tune its speed separately from controller aim slowdown.
 - Fight without a selected target until you press the normal target-lock button. Unlocked attacks follow the camera's horizontal heading even when the character faces elsewhere. Blocking keeps the game's incoming-direction checks.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
@@ -32,7 +33,7 @@ Use **R3 / right-stick click**, or your configured keyboard/controller **target-
 | On | On | Select enemies toward the camera, using the configured cone and switch delay. |
 | On | Off | Keep the selected enemy until you unlock or the target is cleared. |
 
-The camera stays free in all three states. Lock-on, spells and combat actions cannot reattach it to an enemy. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing Camera-directed targeting with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
+Camera behavior is independent of target selection. Free keeps the camera under your control in all three states. Smooth tracking and Native tracking follow only while an enemy is locked; Smooth yields immediately when you move the camera. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing camera or targeting settings with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
 ## Configuration
 
@@ -41,6 +42,9 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Setting | Default | Values |
 | --- | --- | --- |
 | Enable mod | On | Off / On |
+| Camera behavior | Free | Free / Smooth tracking / Native tracking |
+| Tracking speed | 50% | 10–100%, in 5% steps; Smooth only |
+| Tracking resume delay | 750 ms | 0–3000 ms, in 250 ms steps; Smooth only |
 | Camera-directed targeting | On | Off / On |
 | Target switch delay | 65 ms | 0–1000 ms |
 | Targeting cone | 45° | 1–90°; 0 uses the native cone |
@@ -49,17 +53,21 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Slowdown strength | 35% | 0–80% |
 | Logging | Off | Off / On |
 
-Camera freedom is part of Enable mod. Older `freeCamera` preferences remain readable but no longer control camera locking.
+Smooth tracking starts from the current view and eases toward the target without snapping. After manual camera movement, it waits for the resume delay (750 ms is 0.75 seconds) and eases back in over 200 ms. Tracking speed controls the mod's automatic turn strength, not a percentage of native tracking speed. At 50%, its maximum combined turn rate is 90 degrees per second.
+
+The saved camera keys are `cameraMode` (0 Free, 1 Smooth, 2 Native), `trackingSpeed` and `trackingResumeMs`. Older `freeCamera` preferences remain readable but do not control camera behavior. Missing camera preferences start with Free, 50% and 750 ms while existing preferences are retained.
 
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
-Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera-direction and fallback counts, plus aggregate direction-resolution time in microseconds. Leave it Off during normal play.
+Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, camera-direction and fallback counts, and aggregate tracking/direction time in microseconds. Leave it Off during normal play.
 
 ## Implementation
 
 Automatic target requests run only while target lock and Camera-directed targeting are both on. They have a shared 50 ms minimum interval. They make one full native selection pass per interval, deferring the fallback search to the following interval when needed. A single-target validity check can retain the current target during that wait or the switch delay. The game continues to handle candidate eligibility, occlusion and combat targeting rules. Settings updates are event-driven, and the center dot uses the native HUD canvas.
 
 See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
+
+Smooth tracking runs within the native view-rotation update on the game thread, before the game's camera modifiers and rotation limits. It uses only the selected target, with at most one aim-point query and two camera getters per eligible update. It adds no target searches or settings polling. Free, Native and unlocked states skip the tracking helper.
 
 Unlocked attack direction uses camera yaw, so looking up or down keeps attacks horizontal. If camera data is unavailable, the game uses the character's untargeted facing. Both locked modes keep their target-based attack direction.
 

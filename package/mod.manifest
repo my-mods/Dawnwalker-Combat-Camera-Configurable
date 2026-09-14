@@ -3,7 +3,7 @@
   <info>
     <name>Combat Camera - Configurable</name>
     <modid>CombatCamera</modid>
-    <description>Free camera in camera-directed, fixed-target and untargeted combat. Aim unlocked attacks with the camera and configure the behavior in Mod Setting Menu.</description>
+    <description>Free camera, smooth target tracking or native tracking, with camera-directed, fixed-target and untargeted combat. Configure camera behavior in Mod Setting Menu.</description>
     <author>my-mods</author>
     <version>2.0.0</version>
     <created_on>2026-09-13</created_on>

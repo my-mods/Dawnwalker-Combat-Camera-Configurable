@@ -10,7 +10,7 @@
   "version": "2.0.0",
   "category": "Gameplay",
   "author": "my-mods",
-  "summary": "Free the combat camera in all three modes: camera-directed targeting, fixed enemy selection, and untargeted combat. Toggle targeting with your normal lock button. When unlocked, attack toward the camera and block by the incoming attack direction.",
+  "summary": "Choose Free, Smooth tracking or Native tracking for combat. Smooth follows locked enemies gently, with adjustable speed and a pause after manual camera movement. Supports camera-directed targeting, fixed enemy selection and untargeted combat.",
   "tags": [
     "Gameplay",
     "Quality of Life",

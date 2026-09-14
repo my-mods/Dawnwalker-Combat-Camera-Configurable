@@ -11,6 +11,7 @@ struct Settings {
     bool aimAssist{true};
     int assistStrength{35};
     bool debugLogging{false};
+    int cameraMode{0},trackingSpeed{50},trackingResumeMs{750};
 };
 struct Vec3 { double x{}, y{}, z{}; };
 inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
@@ -32,6 +33,37 @@ inline double slowdown(double cosine,int percent) {
     const double t=std::clamp((cosine-edge)/(1.0-edge),0.0,1.0);
     return 1.0-std::clamp(percent,0,80)*0.01*t*t*(3.0-2.0*t);
 }
+inline double angleDelta(double degrees) {
+    double value=std::fmod(degrees+180.0,360.0);
+    return (value<0?value+360.0:value)-180.0;
+}
+// Stateful timing only: each correction starts from the current view, never a
+// retained engine rotation. Time is gameplay delta, so pauses cannot accumulate.
+struct Tracking {
+    double quiet{},ramp{};
+    bool following{};
+    void clear(){*this={};}
+    Vec3 step(Vec3 view,Vec3 desired,double delta,bool input,int speed,int resumeMs) {
+        if(!finite(view)||!finite(desired)||!std::isfinite(delta)||delta<=0||delta>0.25){clear();return {};}
+        if(input){quiet=0;ramp=0;following=false;return {};}
+        delta=std::min(delta,0.05);
+        const double delay=std::clamp(resumeMs,0,3000)*0.001;
+        const double previous=quiet;quiet=std::min(quiet+delta,delay+1.0);
+        if(quiet<delay)return {};
+        double activeDelta=following?delta:std::min(delta,std::max(0.0,quiet-delay));
+        if(previous>=delay)activeDelta=delta;
+        following=true;
+        const double before=ramp;ramp=std::min(0.2,ramp+activeDelta);
+        // Integrate the linear 200ms engagement ramp, avoiding frame-rate drift.
+        const double weighted=activeDelta-(ramp-before)+(ramp*ramp-before*before)/0.4;
+        const double s=std::clamp(speed,10,100)*0.01;
+        const double alpha=-std::expm1(-8.0*s*weighted);
+        Vec3 correction{angleDelta(desired.x-view.x)*alpha,angleDelta(desired.y-view.y)*alpha,0};
+        const double length=std::hypot(correction.x,correction.y),limit=180.0*s*weighted;
+        if(length>limit&&length>0){correction.x*=limit/length;correction.y*=limit/length;}
+        return correction;
+    }
+};
 // Opaque identity values only; ownership changes never bypass the hard budget.
 struct RequestBudget {
     uint64_t last{}; bool used{};

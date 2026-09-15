@@ -1,1 +1,1 @@
-Choose Free Camera, Smooth Tracking or Native Tracking with independent camera-directed or fixed-target selection. Smooth tracking follows your locked enemy, yields to manual camera movement, and resumes after an adjustable delay. Includes adjustable tracking strength and recovery after temporary enemy disappearances.
+Added smooth and native camera tracking, improved tracking when enemies reappear, and fixed the mod not starting for some players.

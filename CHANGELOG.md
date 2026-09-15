@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add Lock to last attacker, an optional targeting toggle that switches to the latest enemy whose attack hits you, including blocks and parries, while target lock is active. Works with Free, Smooth and Native camera behavior and is Off by default.
+
 ## 3.0.0
 
 - Added smooth and native camera tracking, improved tracking when enemies reappear, and fixed the mod not starting for some players.

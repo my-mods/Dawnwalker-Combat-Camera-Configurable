@@ -70,7 +70,7 @@ Identity identity(void* object) {
     return {reinterpret_cast<uintptr_t>(object),index,item->GetSerialNumber()};
 }
 struct Session final:FUObjectDeleteListener {
-    std::array<std::atomic_int,8> watched;
+    std::array<std::atomic_int,14> watched;
     std::atomic_uint32_t invalidated{};
     Session(){for(auto& x:watched)x.store(-1);}
     void NotifyUObjectDeleted(const UObjectBase*,int32_t index) override {
@@ -83,7 +83,7 @@ struct Session final:FUObjectDeleteListener {
 } session;
 bool listening{};
 void Session::OnUObjectArrayShutdown() {
-    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(255);
+    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(16383);
     // Unregister before the engine checks its shutdown listener registry.
     // Leave hook teardown to stop(); no dying game objects are accessed here.
     if(listening){FUObjectArray::RemoveUObjectDeleteListener(this);listening=false;}
@@ -100,6 +100,22 @@ Dwell dwell;
 bool nextFallback{};
 bool playerLocked{};
 bool clearAttackPending{true};
+// Hit callbacks retain only indexed identities. The existing player tick makes
+// one bounded selection attempt after the native hit reaction has completed.
+Identity attackerPendingTargetId,attackerPendingActorId,attackerHeldTargetId,attackerHeldActorId;
+double attackerRemaining{};
+bool attackerSelectionInvalidated{};
+void clearAttackerPending() {
+    if(!attackerPendingTargetId.address)return;
+    attackerPendingTargetId={};attackerPendingActorId={};attackerRemaining=0;
+    session.watched[8]=-1;session.watched[9]=-1;
+}
+void clearAttackerHeld() {
+    if(!attackerHeldTargetId.address)return;
+    attackerHeldTargetId={};attackerHeldActorId={};
+    session.watched[10]=-1;session.watched[11]=-1;
+}
+void clearAttacker(){clearAttackerPending();clearAttackerHeld();}
 // A native temporary loss is different from an ordinary target clear. Keep
 // identities only until its scheduled regain call; never follow a hidden actor.
 Identity recoveryTargetId,recoveryActorId;
@@ -113,6 +129,7 @@ void clearRecovery() {
 }
 void abandonRecovery() {
     if(recoveryRemaining&&!settings.targeting){playerLocked=false;clearAttackPending=true;}
+    if(recoveryRemaining)clearAttackerHeld();
     clearRecovery();
 }
 void* resolve(const Identity& id) {
@@ -122,10 +139,19 @@ void* resolve(const Identity& id) {
     return item&&reinterpret_cast<uintptr_t>(item->GetUObject())==id.address&&
         FUObjectArray::IsValid(item,false)&&item->GetSerialNumber()==id.serial?item->GetUObject():nullptr;
 }
+void* resolveAttacker(const Identity& id) {
+    // The native selector can assign the first serial. Deletion watches remain
+    // armed across native calls, so accepting that assignment cannot accept reuse.
+    if(!id.address)return nullptr;
+    auto item=FUObjectArray::IndexToObject(id.index);
+    return item&&reinterpret_cast<uintptr_t>(item->GetUObject())==id.address&&
+        FUObjectArray::IsValid(item,false)&&(!id.serial||item->GetSerialNumber()==id.serial)?item->GetUObject():nullptr;
+}
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
+    attackerSelectionInvalidated=true;
     cameraInitialized=false;
-    nativeCamera=false;clearTracking();clearRecovery();
+    nativeCamera=false;clearTracking();clearRecovery();clearAttacker();
     cameraOwner.store(nullptr,std::memory_order_release);
     ownerId={};castLockId={};assistTargetId={};pendingId={};dwell.clear();nextFallback=false;assistScale=1;assistAt=0;playerLocked=false;clearAttackPending=true;
     for(auto& x:session.watched)x.store(-1,std::memory_order_relaxed);
@@ -138,6 +164,9 @@ void syncSession() {
     if(mask&8){pendingId={};dwell.clear();session.watched[3]=-1;}
     if(mask&48)clearTracking();
     if(mask&192)abandonRecovery();
+    if(mask&768)clearAttackerPending();
+    if(mask&3072)clearAttackerHeld();
+    if(mask&12288)attackerSelectionInvalidated=true;
 }
 bool live(){return active.load(std::memory_order_relaxed)&&GetCurrentThreadId()==gameThread;}
 bool sameCurrent(void* object,const Identity& id){return id.address && identity(object)==id;}
@@ -162,7 +191,7 @@ bool managed(void* combat,bool cameraContext=false) {
     auto pawn=field<void*>(combat,0xa8);
     if(!gameplay(pawn,true)||field<void*>(pawn,0xc90)!=combat){
         auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
-        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();}
+        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();}
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
@@ -195,6 +224,7 @@ using SetTarget=void(*)(void*,void*);SetTarget originalSetTarget{};
 using Request=void(*)(void*);Request originalRequest{};
 using Lock=void(*)(void*,bool);Lock originalLock{};
 using LoseLock=void(*)(void*,void*,float);LoseLock originalLoseLock{};
+using ReactToHit=void(*)(void*,void*,void*,void*);ReactToHit originalReactToHit{};
 using Script=void(*)(void*,void*,void*);Script originalLockScript{},originalSwitchScript{};
 using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
 SetTarget originalAttackTarget{};
@@ -214,12 +244,14 @@ thread_local void* lockButton{};
 struct TemporaryLoss {void* combat;float duration;};
 thread_local const TemporaryLoss* temporaryLoss{};
 thread_local void* recovering{};
+thread_local void* attackerSelecting{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
     uint64_t lockChanges{},blockedTargets{};
     uint64_t cameraDirections{},directionFallbacks{},directionMicros{};
     uint64_t trackingAttempts{},trackingSteps{},trackingMoves{},trackingInput{},trackingMicros{};
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{};
+    uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerMicros{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -245,6 +277,8 @@ void report(uint64_t now) {
         L" temporaryLosses="+std::to_wstring(metrics.temporaryLosses)+L" targetRecoveries="+std::to_wstring(metrics.targetRecoveries)+
         L" recoveryMisses="+std::to_wstring(metrics.recoveryMisses)+
         L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
+        L" attackerHits="+std::to_wstring(metrics.attackerHits)+L" attackerSwitches="+std::to_wstring(metrics.attackerSwitches)+
+        L" attackerRejected="+std::to_wstring(metrics.attackerRejected)+L" attackerUs="+std::to_wstring(metrics.attackerMicros)+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
 }
@@ -340,7 +374,7 @@ void updateAssist(void* combat,uint64_t now) {
 }
 void request(void* combat) {
     syncSession();
-    if(inRequest||!settings.targeting||recoveryRemaining||!eligible(combat))return;
+    if(inRequest||!settings.targeting||recoveryRemaining||attackerRemaining||attackerHeldTargetId.address||!eligible(combat))return;
     auto config=field<void*>(combat,0x9b8);if(!config)return;
     float parameter=field<float>(config,0x26c);
     if(!std::isfinite(parameter)||parameter<=0||parameter>=1000000)return;
@@ -356,6 +390,7 @@ void request(void* combat) {
     if(settings.debugLogging)metrics.micros+=clockMicros()-before;
 }
 void clearTarget(void* combat) {
+    clearAttacker();
     clearRecovery();
     if(trackingTargetId.address)clearTracking();
     // The native setter removes delegates and publishes the target change.
@@ -363,6 +398,60 @@ void clearTarget(void* combat) {
     if(clearAttackPending){originalAttackTarget(combat,nullptr);clearAttackPending=false;}
     if((field<uint8_t>(combat,0x14a9)!=0)!=playerLocked)originalLock(combat,playerLocked);
     assistScale=1;assistAt=0;dwell.clear();nextFallback=false;
+}
+void reactToHit(void* combat,void* animation,void* attack,void* response) {
+    // PlayerCombatComponent::ReactToHit: R8 is InAttackData, whose +0x28
+    // owns the attacker's combat component. Native reactions include block,
+    // parry and omniblock. No health-loss threshold or borrowed struct survives.
+    if(live()&&settings.lockLastAttacker&&attack&&managed(combat)&&playerLocked){
+        auto target=field<void*>(attack,0x28);const auto targetId=identity(target);
+        auto actor=targetId.address?field<void*>(target,0xa8):nullptr;const auto actorId=identity(actor);
+        if(targetId.address&&actorId.address&&target!=combat&&actor!=field<void*>(combat,0xa8)){
+            attackerPendingTargetId=targetId;attackerPendingActorId=actorId;attackerRemaining=1.0;
+            session.watched[8]=targetId.index;session.watched[9]=actorId.index;
+            if(settings.debugLogging)++metrics.attackerHits;
+        }
+    }
+    originalReactToHit(combat,animation,attack,response);
+}
+void applyAttacker(void* combat,float delta) {
+    if(!attackerRemaining)return;
+    if(!settings.lockLastAttacker||!playerLocked||!std::isfinite(delta)||delta<0||delta>=attackerRemaining){
+        if(settings.debugLogging)++metrics.attackerRejected;
+        clearAttackerPending();return;
+    }
+    attackerRemaining-=delta;
+    if(inRequest||!eligible(combat))return;
+    const auto targetId=attackerPendingTargetId,actorId=attackerPendingActorId;
+    auto target=resolveAttacker(targetId),actor=resolveAttacker(actorId);
+    if(!target||!actor||field<void*>(target,0xa8)!=actor){clearAttackerPending();return;}
+    if(field<void*>(combat,0x1380)==target){
+        attackerHeldTargetId=identity(target);attackerHeldActorId=identity(actor);
+        session.watched[10]=targetId.index;session.watched[11]=actorId.index;
+        clearAttackerPending();return;
+    }
+    auto config=field<void*>(combat,0x9b8);const float distance=config?field<float>(config,0x26c):0;
+    if(!std::isfinite(distance)||distance<=0||distance>=1000000){clearAttackerPending();return;}
+    if(!requestBudget.take(GetTickCount64()))return;
+    clearAttackerPending(); // A newer nested hit must remain pending.
+    const auto before=settings.debugLogging?clockMicros():0;
+    const auto expectedOwner=ownerId;
+    attackerSelectionInvalidated=false;
+    session.watched[12]=targetId.index;session.watched[13]=actorId.index;
+    const auto oldSelecting=selecting,oldAttacker=attackerSelecting;
+    const bool wasRequest=inRequest;selecting=combat;attackerSelecting=actor;inRequest=true;
+    originalSwitch(combat,2,distance,false,false,false,false,false);
+    selecting=oldSelecting;attackerSelecting=oldAttacker;inRequest=wasRequest;
+    syncSession();
+    session.watched[12]=-1;session.watched[13]=-1;
+    if(!attackerSelectionInvalidated&&ownerId==expectedOwner&&resolve(expectedOwner)==combat&&
+       live()&&settings.lockLastAttacker&&playerLocked&&field<void*>(combat,0x1380)==target&&resolveAttacker(targetId)&&resolveAttacker(actorId)){
+        clearRecovery();attackerHeldTargetId=identity(target);attackerHeldActorId=identity(actor);
+        session.watched[10]=targetId.index;session.watched[11]=actorId.index;
+        dwell.clear();nextFallback=false;
+        if(settings.debugLogging)++metrics.attackerSwitches;
+    }else if(settings.debugLogging)++metrics.attackerRejected;
+    if(settings.debugLogging)metrics.attackerMicros+=clockMicros()-before;
 }
 void tick(void* pawn,float delta) {
     auto combat=live()&&pawn?field<void*>(pawn,0xc90):nullptr;
@@ -384,8 +473,12 @@ void tick(void* pawn,float delta) {
     combat=field<void*>(pawn,0xc90);
     if(managed(combat)){
         if(!playerLocked)clearTarget(combat);
+        else{
+            if(attackerHeldTargetId.address&&!recoveryRemaining&&reinterpret_cast<uintptr_t>(field<void*>(combat,0x1380))!=attackerHeldTargetId.address)clearAttackerHeld();
+            applyAttacker(combat,delta);
+        }
     }
-    if(settings.targeting && gameplay(pawn))request(combat);
+    if(settings.targeting&&!attackerRemaining&&!attackerHeldTargetId.address&&gameplay(pawn))request(combat);
     else if(settings.targeting&&settings.aimAssist&&eligible(combat)){
         auto now=GetTickCount64();if(assistBudget.take(now))updateAssist(combat,now);
     }else{assistScale=1;dwell.clear();}
@@ -456,12 +549,13 @@ void* pick(void* context) {
     field<void*>(context,0x50)=nullptr;
     field<uint8_t>(context,0x61)=1;field<uint8_t>(context,0x62)=2;
     field<uint8_t>(context,0x63)=0;field<uint8_t>(context,0x64)=1;field<uint8_t>(context,0x65)=0;
-    if(recovering){
+    if(recovering||attackerSelecting){
         // No search outside the native distance-filtered list, and no substitute
         // enemy if the remembered one is dead, unavailable or occluded.
-        bool present=false;for(int i=0;i<candidates->size;++i)if(candidates->data[i]==recovering){present=true;break;}
+        auto wanted=recovering?recovering:attackerSelecting;
+        bool present=false;for(int i=0;i<candidates->size;++i)if(candidates->data[i]==wanted){present=true;break;}
         if(!present)return nullptr;
-        void* actor=recovering;List singleton{&actor,1,1};field<List*>(context,0x58)=&singleton;
+        void* actor=wanted;List singleton{&actor,1,1};field<List*>(context,0x58)=&singleton;
         field<uint8_t>(context,0x61)=0; // Verified native angular-rejection gate only.
         if(settings.debugLogging)++metrics.dwellChecks;
         return originalPick(context)==actor?actor:nullptr;
@@ -500,6 +594,7 @@ void setTarget(void* combat,void* target) {
             }
         }
         if((target&&!recovering)||(!target&&!temporary&&field<void*>(combat,0x1380)))clearRecovery();
+        if(!temporary&&reinterpret_cast<uintptr_t>(target)!=attackerHeldTargetId.address)clearAttackerHeld();
         // Losing a manual target returns to untargeted combat. Camera targeting
         // keeps the player's request and may find another enemy on its budget.
         if(!target&&!temporary&&!settings.targeting&&field<void*>(combat,0x1380)){playerLocked=false;clearAttackPending=true;}
@@ -684,6 +779,7 @@ extern "C" double Threshold(void* context) {
 void configure(Settings value) {
     if(gameThread&&GetCurrentThreadId()!=gameThread)throw std::runtime_error("Settings must be applied on the game thread");
     const bool cameraChanged=settings.cameraMode!=value.cameraMode;
+    if(settings.lockLastAttacker!=value.lockLastAttacker)clearAttacker();
     settings=value;coneThreshold=value.coneDegrees?std::max(Build::nativeCone,std::cos(value.coneDegrees*3.14159265358979323846/180.0)):Build::nativeCone;
     cameraLogging.store(value.debugLogging,std::memory_order_relaxed);
     cameraMetrics.checks=0;cameraMetrics.accepted=0;cameraMetrics.otherThread=0;
@@ -691,7 +787,7 @@ void configure(Settings value) {
     cameraMetrics.viewChecks=0;cameraMetrics.viewOtherThread=0;
     // The first nine ABI values and legacy freeCamera key remain readable.
     // Camera/targeting Apply preserves the explicit lock-button choice.
-    if(cameraChanged){cameraInitialized=false;clearTracking();clearRecovery();}
+    if(cameraChanged){cameraInitialized=false;clearTracking();if(recoveryRemaining)clearAttackerHeld();clearRecovery();}
     if(!settings.enabled)clearSession();
     dwell.clear();nextFallback=false;assistScale=1;assistAt=0;
     metrics={};active=installed.load()&&settings.enabled&&inputSupported;
@@ -726,6 +822,7 @@ bool start(std::wstring& error) {
         hook(Build::Picker,&pick,originalPick);hook(Build::SetTarget,&setTarget,originalSetTarget);
         hook(Build::Request,&nativeRequest,originalRequest);hook(Build::Lock,&lockTarget,originalLock);
         hook(Build::LoseLock,&loseLock,originalLoseLock);
+        hook(Build::ReactToHit,&reactToHit,originalReactToHit);
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);

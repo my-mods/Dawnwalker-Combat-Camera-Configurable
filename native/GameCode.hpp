@@ -38,7 +38,8 @@ inline constexpr std::array<NativeCompatibility::Code,33> code{{
 {0x5e1ff84,1268,"01d745999a16d77bb8cfee469e491993914dd473b495a1c130b9bc7035e2723b"},
 {0x62737f0,130,"123c535cc90767cfa5ad9f4c1e2e0939ad20de22c1d94fa2af81d07188f37917"},
 }};
-inline constexpr std::array<NativeCompatibility::Pointer,3> pointers{{
+inline constexpr std::array<NativeCompatibility::Pointer,4> pointers{{
+{0x7d64960,0x5e1c800},
 {0x76a7478,0x155bc9c},
 {0x76a7480,0x155bcc8},
 {0x76a74d8,0x17d22f0},

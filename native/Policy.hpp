@@ -12,6 +12,7 @@ struct Settings {
     int assistStrength{35};
     bool debugLogging{false};
     int cameraMode{0},trackingSpeed{50},trackingResumeMs{750};
+    bool lockLastAttacker{false};
 };
 struct Vec3 { double x{}, y{}, z{}; };
 inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }

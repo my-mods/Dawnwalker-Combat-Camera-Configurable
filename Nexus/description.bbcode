@@ -17,6 +17,7 @@ Camera behavior is independent of target selection. Smooth and Native tracking r
 [list]
 [*][b][color=#A8D5C2]Disappearing enemies:[/color][/b] Smooth tracking can recover the same enemy when the game restores targeting after a temporary disappearance, even behind the camera. Works with fixed-target and camera-directed selection; unlocking cancels recovery.
 [*][b][color=#A8D5C2]Three targeting modes:[/color][/b] Select enemies by aiming the camera, keep one enemy selected, or fight with no target selected at all.
+[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] An optional toggle, Off by default. While already locked on, switch to the last enemy whose attack hits you, including blocks and parries. Hold that enemy until another attacker hits you, you unlock or the target is lost. Works with Free, Smooth and Native camera behavior.
 [*][b][color=#A8D5C2]Aim unlocked attacks:[/color][/b] Attack toward the camera's horizontal aim even when the character faces elsewhere. Blocking still requires the correct incoming attack direction, without needing that enemy selected.
 [*][b][color=#A8D5C2]Optional center dot:[/color][/b] Choose Off, Weapon drawn, or Always in gameplay. Off is the default. The dot uses the game's HUD and hides during menus, cinematics and loading.
 [*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] Reduce right-stick camera sensitivity near your target during camera-directed targeting, with adjustable strength. Fixed-target and untargeted modes keep full sensitivity. It does not steer the camera, and mouse movement is excluded.
@@ -40,6 +41,7 @@ Open Mod Settings, select [b]Combat Camera - Configurable[/b], adjust the contro
 [*][b][color=#A8D5C2]Tracking speed:[/color][/b] 50% by default, adjustable from 10% to 100% in 5% steps. Shown only for Smooth tracking. Controls automatic following independently of controller aim slowdown.
 [*][b][color=#A8D5C2]Tracking resume delay:[/color][/b] 750 ms (0.75 seconds) by default, adjustable from 0 to 3000 ms in 250 ms steps. Shown only for Smooth tracking. Manual camera movement pauses tracking, which then eases back in after this delay.
 [*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On selects enemies toward the camera while locked. Off retains your chosen enemy. Both choices work with all three camera behaviors.
+[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority over camera-directed selection after a hit. Hits while unlocked never turn target lock on. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.
 [*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.
 [*][b][color=#A8D5C2]Targeting cone:[/color][/b] 45° from the camera axis by default; adjustable from 1° to 90°. Set 0 to use the native cone.
 [*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.
@@ -60,7 +62,7 @@ Press [b]R3 / right-stick click[/b], or your configured keyboard/controller [b]t
 
 Both locked modes keep their target-based attack direction. Moving the right stick or mouse controls the camera and does not cycle a fixed target. Applying camera or targeting settings preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
-Automatic targeting runs only while target lock and Camera-directed targeting are both on. It shares a 50 ms minimum interval between full native selection passes. A fallback search waits until the next interval, while a single-target validity check can retain the current target. The game still handles eligibility, visibility and combat targeting rules. Settings are read at startup and updated through Apply, without repeated INI polling.
+Camera-directed searches run only while target lock and Camera-directed targeting are both on, and pause while a last attacker has priority. Last-attacker requests use the same budget and check only that enemy in the native candidate list. It shares a 50 ms minimum interval between full native selection passes. A fallback search waits until the next interval, while a single-target validity check can retain the current target. The game still handles eligibility, visibility and combat targeting rules. Settings are read at startup and updated through Apply, without repeated INI polling.
 
 [size=4][b][color=#E8C88A]Credits and source[/color][/b][/size]
 

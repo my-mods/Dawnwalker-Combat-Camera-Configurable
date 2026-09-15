@@ -9,6 +9,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 - **Native Tracking Camera:** Use the game's normal target tracking speed.
 - Fight without a selected target until you press the normal target-lock button. Unlocked attacks follow the camera's horizontal heading even when the character faces elsewhere. Blocking keeps the game's incoming-direction checks.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
+- Optionally **Lock to last attacker** after a hit, block or parry while already locked on. This is Off by default and works with every camera behavior.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
 - Add optional controller aim slowdown during camera-directed targeting. Fixed-target and untargeted modes keep full camera sensitivity. Mouse movement is excluded.
 - Choose camera behavior, tracking strength, resume delay, target selection, center dot and slowdown in Mod Setting Menu and press **Apply**. Preferences are saved for subsequent launches.
@@ -36,6 +37,8 @@ Use **R3 / right-stick click**, or your configured keyboard/controller **target-
 
 Camera behavior is independent of target selection. Free keeps the camera under your control in all three states. Smooth tracking and Native tracking follow only while an enemy is locked; Smooth yields immediately when you move the camera. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing camera or targeting settings with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
+**Lock to last attacker** adds a priority to either locked targeting style. A hit, including a blocked or parried hit, switches to that attacker and holds them against camera-directed selection. The next attacker to hit you takes priority. Hits from behind do not need to pass the camera cone or target switch delay, but the enemy must still satisfy the game's range, visibility and target eligibility rules. An unavailable attacker leaves your current target alone. Unlocking cancels the priority; hits while unlocked never turn target lock on. Enabling the option starts listening for new hits and does not select an earlier attacker. Ordinary target loss releases the priority; Smooth tracking retains it during its supported temporary-disappearance recovery.
+
 ## Configuration
 
 Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls and press **Apply**. Settings stay active across save loads and are read again at the next launch.
@@ -47,6 +50,7 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Tracking speed | 50% | 10–100%, in 5% steps; Smooth only |
 | Tracking resume delay | 750 ms | 0–3000 ms, in 250 ms steps; Smooth only |
 | Camera-directed targeting | On | Off / On |
+| Lock to last attacker | Off | Off / On; requires active target lock |
 | Target switch delay | 65 ms | 0–1000 ms |
 | Targeting cone | 45° | 1–90°; 0 uses the native cone |
 | Center dot | Off | Off / Weapon drawn / Always in gameplay |
@@ -60,13 +64,17 @@ When an enemy temporarily breaks target lock to disappear, Smooth tracking waits
 
 The saved camera keys are `cameraMode` (0 Free, 1 Smooth, 2 Native), `trackingSpeed` and `trackingResumeMs`. Older `freeCamera` preferences remain readable but do not control camera behavior. Missing camera preferences start with Free, 50% and 750 ms while existing preferences are retained.
 
+The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferences receive the missing key with value 0. Changing this option with Apply preserves your lock state; turning it Off releases its targeting priority.
+
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
-Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses and recoveries, camera-direction and fallback counts, and aggregate tracking/direction time in microseconds. Leave it Off during normal play.
+Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses and recoveries, attacker hits/switches/rejections, camera-direction and fallback counts, and aggregate tracking/direction/attacker time in microseconds. Leave it Off during normal play.
 
 ## Implementation
 
 Automatic target requests run only while target lock and Camera-directed targeting are both on. They have a shared 50 ms minimum interval. They make one full native selection pass per interval, deferring the fallback search to the following interval when needed. A single-target validity check can retain the current target during that wait or the switch delay. The game continues to handle candidate eligibility, occlusion and combat targeting rules. Settings updates are event-driven, and the center dot uses the native HUD canvas.
+
+Last-attacker requests use the same interval and check only that attacker within the native candidate list. Rapid hits coalesce into the newest request. A pending hit can wait up to one second of gameplay time for an eligible player state; an attempted but rejected selection is not retried. Holding the attacker suspends camera-directed searches while keeping the selected camera behavior and optional controller slowdown. The option adds no settings polling or object searches while idle.
 
 See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
 

@@ -1,9 +1,8 @@
-// Verified against the exact executable and host hashes below. No pattern scan at runtime.
+// Reference: Steam 25232147. GameCode.hpp validates the required native functions.
 #pragma once
 #include <array>
 #include <cstdint>
 namespace CombatCamera::Build {
-inline constexpr char gameHash[]="cb9b7d7bd88a6754c0a9c08318aa64d5013ddfd92d5badcae84e1b4ea980dcfc";
 inline constexpr char hostHash[]="fb1839ee91f71f83d508d44a2763a15ac1bb0c5fb4e504ac0fcfca64376a054a";
 inline constexpr uintptr_t Tick=0x16ecdb8;
 inline constexpr uintptr_t Switch=0x5e1ff84;

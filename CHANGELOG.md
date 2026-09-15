@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Allow executable-file differences outside the native camera code and layouts used by the mod.
+- Identify the required native function, table or patch address when initialization cannot proceed.
+
 ## 3.0.0
 
 - Add independent Free, Smooth tracking and Native tracking camera behaviors. Free remains the default.

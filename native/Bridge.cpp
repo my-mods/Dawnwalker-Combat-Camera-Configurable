@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include "Bridge.hpp"
 #include "GameBuild.hpp"
+#include "GameCode.hpp"
 
 extern "C" {
     void CameraGate(); void ConeGate(); void ForwardGate();
@@ -704,10 +705,12 @@ bool start(std::wstring& error) {
     if(attempted){error=startError;return installed.load();}attempted=true;gameThread=GetCurrentThreadId();moduleBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     wchar_t path[32768]{};
     try{
-        if(!GetModuleFileNameW(nullptr,path,32768)||!hashFile(path,Build::gameHash))throw std::runtime_error("Unsupported Dawnwalker executable; no patches installed");
+        NativeCompatibility::validateContract(moduleBase,Build::code,Build::pointers);
         auto host=GetModuleHandleW(L"UE4SS.dll");
         if(!host||!GetModuleFileNameW(host,path,32768)||!hashFile(path,Build::hostHash))throw std::runtime_error("Unsupported UE4SS build; use Framecore 2b");
-        for(auto& site:Build::guards)if(std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)throw std::runtime_error("Game code differs at a required hook; disable conflicting camera mods");
+        for(auto& site:Build::guards)if(!NativeCompatibility::accessible(moduleBase,site.rva,site.size,true)
+            ||std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)
+            throw std::runtime_error("Game code differs at hook RVA "+NativeCompatibility::location(site.rva)+"; no patches installed");
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's FName constructor, resolved from the exact build. Stores
         // value IDs only and is called four times on the game thread at startup.

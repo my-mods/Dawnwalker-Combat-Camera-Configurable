@@ -8,6 +8,6 @@
     <version>3.0.0</version>
     <created_on>2026-09-13</created_on>
   </info>
-  <supports><game>The Blood of Dawnwalker</game><steam_build>25232147</steam_build><loader>Framecore 2b</loader></supports>
+  <supports><game>The Blood of Dawnwalker</game><loader>Framecore 2b</loader></supports>
   <dependencies><dependency>Mod Setting Menu 1.0.6 or later</dependency></dependencies>
 </mod>

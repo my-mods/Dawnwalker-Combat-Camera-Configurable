@@ -1,3 +1,3 @@
-# Combat Camera - Configurable 3.0.0
+# Combat Camera - Configurable 3.1.0
 
-Added smooth and native camera tracking, improved tracking when enemies reappear, and fixed the mod not starting for some players.
+Added optional Lock to last attacker targeting: while already locked on, switch to the latest enemy whose attack hits you, including blocks and parries. Off by default and works with Free, Smooth and Native camera behavior.

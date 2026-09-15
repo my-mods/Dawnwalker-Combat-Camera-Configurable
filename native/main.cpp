@@ -8,7 +8,7 @@ using Lua=LuaMadeSimple::Lua;
 static_assert(sizeof(CppUserModBase)==192,"Unsupported UE4SS C++ host layout");
 class CombatCameraMod final:public CppUserModBase {
 public:
-    CombatCameraMod(){ ModName=STR("Combat Camera - Configurable");ModVersion=STR("3.0.0");ModAuthors=STR("my-mods"); }
+    CombatCameraMod(){ ModName=STR("Combat Camera - Configurable");ModVersion=STR("3.1.0");ModAuthors=STR("my-mods"); }
     void on_lua_start(StringViewType name,Lua& lua,Lua&,Lua&,Lua*) override {
         if(name!=STR("CombatCamera"))return;
         lua.register_function("_CCSet",[](const Lua& l){

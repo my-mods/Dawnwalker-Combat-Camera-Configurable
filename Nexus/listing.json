@@ -5,9 +5,9 @@
   "nexus": {
     "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/480",
     "modId": 480,
-    "fileId": 1881
+    "fileId": 1953
   },
-  "version": "3.0.0",
+  "version": "3.1.0",
   "category": "Gameplay",
   "author": "my-mods",
   "summary": "Choose Free Camera, Smooth Tracking or Native Tracking independently of target selection. Smooth tracking gently follows locked enemies, yields to manual camera movement, and resumes after an adjustable delay. Set its tracking strength in Mod Setting Menu.",
@@ -20,7 +20,7 @@
   "file": {
     "displayName": "Combat Camera - Configurable",
     "filename": "Combat-Camera-Configurable.zip",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "category": "Main",
     "modManagerDownload": true
   },

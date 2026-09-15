@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 3.1.0
 
-- Add Lock to last attacker, an optional targeting toggle that switches to the latest enemy whose attack hits you, including blocks and parries, while target lock is active. Works with Free, Smooth and Native camera behavior and is Off by default.
+- Added optional Lock to last attacker targeting: while already locked on, switch to the latest enemy whose attack hits you, including blocks and parries. Off by default and works with Free, Smooth and Native camera behavior.
 
 ## 3.0.0
 

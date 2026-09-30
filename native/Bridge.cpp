@@ -628,10 +628,10 @@ void* abilityCombat(void* pawn) {
     return combat&&field<void*>(combat,0xa8)==pawn&&managed(combat)&&!playerLocked&&
         (field<uint8_t>(combat,0x8e)&0x10)&&!field<uint8_t>(combat,0x1612)?combat:nullptr;
 }
-void* abilityEnemy(void* combat) {
+void* abilityEnemy(void* combat,bool fresh) {
     if(inRequest||focusQuery)return nullptr;
     const auto now=GetTickCount64();
-    if(abilityQueried&&now-abilityQueryAt<50){
+    if(!fresh&&abilityQueried&&now-abilityQueryAt<50){
         return resolve(abilityTargetId)?resolve(abilityActorId):nullptr;
     }
     abilityQueried=true;abilityQueryAt=now;abilityTargetId={};abilityActorId={};
@@ -662,8 +662,7 @@ void* abilityEnemy(void* combat) {
 // Try the native no-target reference first. The same level/type dispatch
 // used by CanBeActivated distinguishes Self (1) from Single/All/AoE (0/2/3).
 // Those three types reject their owner as a primary target in native code.
-bool routeAbility(void* ability,void* pawn,void* combat,uint8_t* reason,bool* detail,void*& target) {
-    const auto supplied=target;
+bool routeAbility(void* ability,void* pawn,void* combat,uint8_t* reason,bool* detail,void*& target,bool fresh=false) {
     target=pawn;
     const bool initialDetail=detail?*detail:false;
     const bool accepted=originalCanAbility(ability,pawn,pawn,reason,detail);
@@ -672,7 +671,8 @@ bool routeAbility(void* ability,void* pawn,void* combat,uint8_t* reason,bool* de
     const int level=method<int(*)(void*,void*)>(ability,0x4e0)(ability,pawn);
     const auto type=method<uint8_t(*)(void*,int)>(ability,0x540)(ability,level);
     if(type!=0&&type!=2&&type!=3)return false;
-    target=supplied&&supplied!=pawn?supplied:abilityEnemy(combat);
+    // Unlocked casts follow camera aim, never a leftover focus actor.
+    target=abilityEnemy(combat,fresh);
     if(!target)return false;
     if(detail)*detail=initialDetail;
     return originalCanAbility(ability,pawn,target,reason,detail);
@@ -683,7 +683,7 @@ bool canAbility(void* ability,void* pawn,void* target,uint8_t* reason,bool* deta
         return originalCanAbility(ability,pawn,target,reason,detail);
     struct Restore {bool previous;~Restore(){checkingAbility=previous;}} restore{checkingAbility};
     checkingAbility=true;
-    void* chosen=target;return routeAbility(ability,pawn,combat,reason,detail,chosen);
+    void* chosen{};return routeAbility(ability,pawn,combat,reason,detail,chosen);
 }
 void* focusActor(void* focus) {
     if(live()&&abilityPlan&&abilityPlan->focus==focus)return resolve(abilityPlan->actor);
@@ -699,8 +699,9 @@ bool planAbility(void* focus,void* ability) {
         return originalPlanAbility(focus,ability);
     struct Restore {bool checking;AbilityPlan* plan;~Restore(){checkingAbility=checking;abilityPlan=plan;}} restore{checkingAbility,abilityPlan};
     checkingAbility=true;
-    uint8_t reason{};bool detail{};void* target=originalFocusActor(focus);
-    if(!routeAbility(ability,pawn,combat,&reason,&detail,target))return false;
+    uint8_t reason{};bool detail{};void* target{};
+    // Recheck current aim at activation, even inside the availability cache window.
+    if(!routeAbility(ability,pawn,combat,&reason,&detail,target,true))return false;
     AbilityPlan plan{focus,identity(target)};
     if(!plan.actor.address||!abilityCombat(pawn))return false;
     abilityPlan=&plan;

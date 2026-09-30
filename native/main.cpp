@@ -21,6 +21,7 @@ public:
             s.aimAssist=number(0,1)!=0;s.assistStrength=number(0,80);s.debugLogging=number(0,1)!=0;
             s.cameraMode=number(0,2);s.trackingSpeed=number(10,100);s.trackingResumeMs=number(0,3000);
             s.lockLastAttacker=number(0,1)!=0;
+            s.autoLockOnHit=number(0,1)!=0;s.afterTargetDeath=number(0,1);
             CombatCamera::configure(s);return 0;
         });
         lua.register_function("_CCStart",[](const Lua& l){

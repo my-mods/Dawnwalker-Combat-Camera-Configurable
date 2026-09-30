@@ -13,6 +13,8 @@ struct Settings {
     bool debugLogging{false};
     int cameraMode{0},trackingSpeed{50},trackingResumeMs{750};
     bool lockLastAttacker{false};
+    bool autoLockOnHit{false};
+    int afterTargetDeath{0}; // 0: nearest eligible enemy, 1: wait for another hit.
 };
 struct Vec3 { double x{}, y{}, z{}; };
 inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }

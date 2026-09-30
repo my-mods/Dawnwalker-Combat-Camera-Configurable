@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Automatically lock onto incoming attackers, including blocks and parries, and choose the nearest eligible enemy or wait for another hit after the target dies.
+
 ## 3.2.0
 
 - Add 50 ms steps for Tracking resume delay and explain its interaction with Target switch delay.

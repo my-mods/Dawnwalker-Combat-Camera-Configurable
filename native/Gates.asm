@@ -3,6 +3,8 @@
 ; stack bytes so every predicate call has aligned RSP and native shadow space.
 EXTERN ShouldFreeCamera:PROC
 EXTERN Threshold:PROC
+EXTERN UseNearestScore:PROC
+EXTERN ScoreOriginal:QWORD
 EXTERN ResolveFreeDirection:PROC
 EXTERN ShouldPreventCameraAttach:PROC
 EXTERN AttachDirectOriginal:QWORD
@@ -102,6 +104,23 @@ ConeGate PROC FRAME
     RESTORE_STATE
     jmp QWORD PTR [ConeContinue]
 ConeGate ENDP
+ScoreGate PROC FRAME
+    SAVE_STATE
+    mov rcx, rbx
+    call UseNearestScore
+    test al, al
+    jz keep_camera_score
+    ; The verified picker retains squared pawn-to-aim-point distance in XMM4.
+    ; Replace only its score. Native predicates and visibility still follow.
+    movsd xmm6, QWORD PTR [rsp+60h]
+    ucomisd xmm6, xmm6
+    jnp keep_camera_score
+    movsd xmm6, xmm15 ; Reject nonfinite geometry at the native comparison.
+keep_camera_score:
+    RESTORE_STATE
+    ; Replay the original score comparison and branch via the trampoline.
+    jmp QWORD PTR [ScoreOriginal]
+ScoreGate ENDP
 ForwardGate PROC FRAME
     SAVE_STATE 20h
     ; Dedicated aligned scratch space above saved XMM0-XMM5. Native XY is

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.3.0
 
 - Automatically lock onto incoming attackers, including blocks and parries, and choose the nearest eligible enemy or wait for another hit after the target dies.
 

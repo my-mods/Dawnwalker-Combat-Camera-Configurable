@@ -108,6 +108,10 @@ bool clearAttackPending{true};
 Identity attackerPendingTargetId,attackerPendingActorId,attackerHeldTargetId,attackerHeldActorId;
 double attackerRemaining{};
 bool attackerSelectionInvalidated{};
+bool attackerLookOverride{};
+void clearAttackerLook() {
+    attackerLookOverride=false;dwell.clear();pendingId={};session.watched[3]=-1;
+}
 void clearAttackerPending() {
     if(!attackerPendingTargetId.address)return;
     attackerPendingTargetId={};attackerPendingActorId={};attackerRemaining=0;
@@ -115,6 +119,7 @@ void clearAttackerPending() {
 }
 void clearAttackerHeld() {
     if(!attackerHeldTargetId.address)return;
+    clearAttackerLook();
     attackerHeldTargetId={};attackerHeldActorId={};
     session.watched[10]=-1;session.watched[11]=-1;
 }
@@ -264,7 +269,7 @@ struct Metrics {
     uint64_t cameraDirections{},directionFallbacks{},directionMicros{};
     uint64_t trackingAttempts{},trackingSteps{},trackingMoves{},trackingInput{},trackingMicros{};
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{};
-    uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerMicros{};
+    uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
     uint64_t focusQueries{},focusTargets{},focusMicros{};
     uint64_t since{};
 } metrics;
@@ -294,7 +299,7 @@ void report(uint64_t now) {
         L" recoveryMisses="+std::to_wstring(metrics.recoveryMisses)+
         L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
         L" attackerHits="+std::to_wstring(metrics.attackerHits)+L" attackerSwitches="+std::to_wstring(metrics.attackerSwitches)+
-        L" attackerRejected="+std::to_wstring(metrics.attackerRejected)+L" attackerUs="+std::to_wstring(metrics.attackerMicros)+
+        L" attackerRejected="+std::to_wstring(metrics.attackerRejected)+L" attackerOverrides="+std::to_wstring(metrics.attackerOverrides)+L" attackerUs="+std::to_wstring(metrics.attackerMicros)+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
 }
@@ -363,12 +368,28 @@ void viewRotation(void* camera,float delta,Vec3* view,Vec3* input) {
         cameraMetrics.viewChecks.fetch_add(1,std::memory_order_relaxed);
         if(GetCurrentThreadId()!=gameThread)cameraMetrics.viewOtherThread.fetch_add(1,std::memory_order_relaxed);
     }
-    if(live()&&settings.cameraMode==1&&playerLocked&&
+    if(live()&&playerLocked&&
        reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase==Build::ViewRotationReturn){
-        const auto before=settings.debugLogging?clockMicros():0;
-        if(settings.debugLogging)++metrics.trackingAttempts;
-        smoothView(camera,delta,view,input);
-        if(settings.debugLogging)metrics.trackingMicros+=clockMicros()-before;
+        // Observe manual look before Smooth adds its own correction. Only the
+        // current player's camera can arm an override, in all camera modes.
+        if(camera&&settings.targeting&&attackerHeldTargetId.address&&!attackerLookOverride&&
+           !attackerRemaining&&!recoveryRemaining&&view&&finite(*view)&&input&&finite(*input)&&
+           std::isfinite(delta)&&delta>0&&delta<=0.25f&&
+           (input->x!=0.0||input->y!=0.0)){
+            auto combat=resolve(ownerId);
+            if(combat&&managed(combat)&&attackerHeldTargetId.address){
+                auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
+                if(field<void*>(pc,0x370)==camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)){
+                    clearAttackerLook();attackerLookOverride=true;nextFallback=false;
+                }
+            }
+        }
+        if(settings.cameraMode==1){
+            const auto before=settings.debugLogging?clockMicros():0;
+            if(settings.debugLogging)++metrics.trackingAttempts;
+            smoothView(camera,delta,view,input);
+            if(settings.debugLogging)metrics.trackingMicros+=clockMicros()-before;
+        }
     }
     originalViewRotation(camera,delta,view,input);
 }
@@ -390,7 +411,8 @@ void updateAssist(void* combat,uint64_t now) {
 }
 void request(void* combat) {
     syncSession();
-    if(inRequest||!settings.targeting||recoveryRemaining||attackerRemaining||attackerHeldTargetId.address||!eligible(combat))return;
+    if(inRequest||!settings.targeting||recoveryRemaining||attackerRemaining||
+       (attackerHeldTargetId.address&&!attackerLookOverride)||!eligible(combat))return;
     auto config=field<void*>(combat,0x9b8);if(!config)return;
     float parameter=field<float>(config,0x26c);
     if(!std::isfinite(parameter)||parameter<=0||parameter>=1000000)return;
@@ -423,6 +445,7 @@ void reactToHit(void* combat,void* animation,void* attack,void* response) {
         auto target=field<void*>(attack,0x28);const auto targetId=identity(target);
         auto actor=targetId.address?field<void*>(target,0xa8):nullptr;const auto actorId=identity(actor);
         if(targetId.address&&actorId.address&&target!=combat&&actor!=field<void*>(combat,0xa8)){
+            clearAttackerLook();nextFallback=false;
             attackerPendingTargetId=targetId;attackerPendingActorId=actorId;attackerRemaining=1.0;
             session.watched[8]=targetId.index;session.watched[9]=actorId.index;
             if(settings.debugLogging)++metrics.attackerHits;
@@ -494,7 +517,7 @@ void tick(void* pawn,float delta) {
             applyAttacker(combat,delta);
         }
     }
-    if(settings.targeting&&!attackerRemaining&&!attackerHeldTargetId.address&&gameplay(pawn))request(combat);
+    if(settings.targeting&&!attackerRemaining&&(!attackerHeldTargetId.address||attackerLookOverride)&&gameplay(pawn))request(combat);
     else if(settings.targeting&&settings.aimAssist&&eligible(combat)){
         auto now=GetTickCount64();if(assistBudget.take(now))updateAssist(combat,now);
     }else{assistScale=1;dwell.clear();}
@@ -581,6 +604,25 @@ void* pick(void* context) {
     else if(settings.debugLogging){++metrics.pickCalls;metrics.candidates+=candidates->size;}
     void* chosen=originalPick(context);
     if(automaticRequest&&!fallbackRequest&&!retainOnly&&!chosen)nextFallback=true;
+    if(automaticRequest&&attackerLookOverride&&reinterpret_cast<uintptr_t>(previous)==attackerHeldActorId.address){
+        // Hover switching must finish its dwell even when the attacker is now
+        // behind the camera. Retain only an in-range, natively eligible attacker;
+        // omit the angular test for retention, never for the replacement.
+        if(chosen&&chosen!=previous){
+            const auto nextId=identity(chosen);
+            if(!nextId.address)return nullptr;
+            if(nextId!=pendingId){dwell.clear();pendingId=nextId;session.watched[3]=nextId.index;}
+            if(dwell.ready(reinterpret_cast<uintptr_t>(selecting),reinterpret_cast<uintptr_t>(chosen),GetTickCount64(),settings.delayMs))return chosen;
+        }else{
+            dwell.clear();pendingId={};session.watched[3]=-1;
+            if(chosen==previous||fallbackRequest)clearAttackerLook();
+        }
+        bool present=false;for(int i=0;i<candidates->size;++i)if(candidates->data[i]==previous){present=true;break;}
+        if(!present)return chosen;
+        field<List*>(context,0x58)=&waiting;field<uint8_t>(context,0x61)=0;
+        if(settings.debugLogging)++metrics.dwellChecks;
+        return originalPick(context)==previous?previous:chosen;
+    }
     if(!automaticRequest||!previous||!chosen||chosen==previous){dwell.clear();pendingId={};session.watched[3]=-1;return chosen;}
     auto nextId=identity(chosen);
     if(!nextId.address)return nullptr;
@@ -613,7 +655,10 @@ void setTarget(void* combat,void* target) {
             }
         }
         if((target&&!recovering)||(!target&&!temporary&&field<void*>(combat,0x1380)))clearRecovery();
-        if(!temporary&&reinterpret_cast<uintptr_t>(target)!=attackerHeldTargetId.address)clearAttackerHeld();
+        if(!temporary&&reinterpret_cast<uintptr_t>(target)!=attackerHeldTargetId.address){
+            if(target&&automaticRequest&&attackerLookOverride&&settings.debugLogging)++metrics.attackerOverrides;
+            clearAttackerHeld();
+        }
         // Losing a manual target returns to untargeted combat. Camera targeting
         // keeps the player's request and may find another enemy on its budget.
         if(!target&&!temporary&&!settings.targeting&&field<void*>(combat,0x1380)){playerLocked=false;clearAttackPending=true;}
@@ -868,6 +913,7 @@ extern "C" double Threshold(void* context) {
 void configure(Settings value) {
     if(gameThread&&GetCurrentThreadId()!=gameThread)throw std::runtime_error("Settings must be applied on the game thread");
     const bool cameraChanged=settings.cameraMode!=value.cameraMode;
+    if(attackerHeldTargetId.address)clearAttackerLook();
     if(settings.lockLastAttacker!=value.lockLastAttacker)clearAttacker();
     settings=value;coneThreshold=value.coneDegrees?std::max(Build::nativeCone,std::cos(value.coneDegrees*3.14159265358979323846/180.0)):Build::nativeCone;
     cameraLogging.store(value.debugLogging,std::memory_order_relaxed);

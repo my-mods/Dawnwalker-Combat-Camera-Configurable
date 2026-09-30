@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add 50 ms steps for Tracking resume delay and explain its interaction with Target switch delay.
+- Allow deliberate camera aiming to override last-attacker priority after Target switch delay when Camera-directed targeting is On.
 - Allow unlocked abilities to cast without automatic targeting when their native rules accept a self-centered cast. Select an enemy under current camera aim only for abilities that require a primary target, ignoring old ability targets without enabling combat lock.
 - Remove loader-fingerprint restrictions so compatible UE4SS builds can start the native camera integration.
 

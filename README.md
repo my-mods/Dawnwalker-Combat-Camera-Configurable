@@ -38,7 +38,7 @@ Use **R3 / right-stick click**, or your configured keyboard/controller **target-
 
 Camera behavior is independent of target selection. Free keeps the camera under your control in all three states. Smooth tracking and Native tracking follow only while an enemy is locked; Smooth yields immediately when you move the camera. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing camera or targeting settings with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
-**Lock to last attacker** adds a priority to either locked targeting style. A hit, including a blocked or parried hit, switches to that attacker and holds them against camera-directed selection. The next attacker to hit you takes priority. Hits from behind do not need to pass the camera cone or target switch delay, but the enemy must still satisfy the game's range, visibility and target eligibility rules. An unavailable attacker leaves your current target alone. Unlocking cancels the priority; hits while unlocked never turn target lock on. Enabling the option starts listening for new hits and does not select an earlier attacker. Ordinary target loss releases the priority; Smooth tracking retains it during its supported temporary-disappearance recovery.
+**Lock to last attacker** adds a priority to either locked targeting style. A hit, including a blocked or parried hit, switches to that attacker and gives them priority. With Camera-directed targeting On, move the camera toward another eligible enemy and hold aim for Target switch delay to choose them instead. Automatic tracking alone does not override the attacker. With Camera-directed targeting Off, camera movement keeps the attacker selected. The next attacker to hit you takes priority. Hits from behind do not need to pass the camera cone or target switch delay, but the enemy must still satisfy the game's range, visibility and target eligibility rules. An unavailable attacker leaves your current target alone. Unlocking cancels the priority; hits while unlocked never turn target lock on. Enabling the option starts listening for new hits and does not select an earlier attacker. Ordinary target loss releases the priority; Smooth tracking retains it during its supported temporary-disappearance recovery.
 
 ## Configuration
 
@@ -49,7 +49,7 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Enable mod | On | Off / On |
 | Camera behavior | Free | Free / Smooth tracking / Native tracking |
 | Tracking speed | 50% | 10Ã¢â‚¬â€œ100%, in 5% steps; Smooth only |
-| Tracking resume delay | 750 ms | 0Ã¢â‚¬â€œ3000 ms, in 250 ms steps; Smooth only |
+| Tracking resume delay | 750 ms | 0Ã¢â‚¬â€œ3000 ms, in 50 ms steps; Smooth only |
 | Camera-directed targeting | On | Off / On |
 | Lock to last attacker | Off | Off / On; requires active target lock |
 | Target switch delay | 65 ms | 0Ã¢â‚¬â€œ1000 ms |
@@ -59,7 +59,7 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Slowdown strength | 35% | 0Ã¢â‚¬â€œ80% |
 | Logging | Off | Off / On |
 
-Smooth tracking starts from the current view and eases toward the target without snapping. After manual camera movement, it waits for the resume delay (750 ms is 0.75 seconds) and eases back in over 200 ms. Tracking speed controls the mod's automatic turn strength, not a percentage of native tracking speed. At 50%, its maximum combined turn rate is 90 degrees per second.
+Smooth tracking starts from the current view and eases toward the target without snapping. After manual camera movement, it waits for the resume delay (750 ms is 0.75 seconds) and eases back in over 200 ms. Tracking speed controls the mod's automatic turn strength, not a percentage of native tracking speed. At 50%, its maximum combined turn rate is 90 degrees per second. At 100%, the limit is 180 degrees per second. With Camera-directed targeting On, keep Tracking resume delay longer than Target switch delay and allow extra time for target selection: searches run at 50 ms intervals and a fallback can need another interval. Otherwise tracking can pull the camera away before your new target is selected.
 
 When an enemy temporarily breaks target lock to disappear, Smooth tracking waits for the game's recovery signal and reacquires that same enemy if it is still a valid target, even behind the camera. This works with fixed-target and camera-directed selection. The camera pauses during the disappearance and resumes smoothly from your current view. Unlocking cancels recovery; ordinary target loss and Free/Native behavior keep their existing rules.
 
@@ -69,13 +69,13 @@ The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferen
 
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
-Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses and recoveries, attacker hits/switches/rejections, camera-direction and fallback counts, and aggregate tracking/direction/attacker time in microseconds. Leave it Off during normal play.
+Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses and recoveries, attacker hits/switches/rejections/manual overrides, camera-direction and fallback counts, and aggregate tracking/direction/attacker time in microseconds. Leave it Off during normal play.
 
 ## Implementation
 
 Automatic target requests run only while target lock and Camera-directed targeting are both on. They have a shared 50 ms minimum interval. They make one full native selection pass per interval, deferring the fallback search to the following interval when needed. A single-target validity check can retain the current target during that wait or the switch delay. The game continues to handle candidate eligibility, occlusion and combat targeting rules. Settings updates are event-driven, and the center dot uses the native HUD canvas.
 
-Last-attacker requests use the same interval and check only that attacker within the native candidate list. Rapid hits coalesce into the newest request. A pending hit can wait up to one second of gameplay time for an eligible player state; an attempted but rejected selection is not retried. Holding the attacker suspends camera-directed searches while keeping the selected camera behavior and optional controller slowdown. The option adds no settings polling or object searches while idle.
+Last-attacker requests use the same interval and check only that attacker within the native candidate list. Rapid hits coalesce into the newest request. A pending hit can wait up to one second of gameplay time for an eligible player state; an attempted but rejected selection is not retried. Holding the attacker suspends camera-directed searches until manual camera movement requests an override. A different candidate must remain preferred for Target switch delay; a valid attacker can stay selected outside the camera cone during that wait. Looking back at the attacker or finding no alternative ends the override attempt. A new hit restarts attacker priority. Fixed-target mode keeps its existing behavior. The selected camera behavior and optional controller slowdown remain active. The option adds no settings polling or object searches while idle.
 
 See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
 

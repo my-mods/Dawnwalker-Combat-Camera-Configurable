@@ -17,7 +17,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 ## Requirements
 
 - The Blood of Dawnwalker for PC, with the native functions supported by the bundled integration. Reference build: **1.0.5 / Steam 25232147**.
-- [Dawnwalker Framecore UE4SS runtime](https://www.nexusmods.com/thebloodofdawnwalker/mods/283), specifically **2b**.
+- [Framecore UE4SS 2b](https://www.nexusmods.com/thebloodofdawnwalker/mods/283) or [Vercadi UE4SS 1.2.1-rc6](https://www.nexusmods.com/thebloodofdawnwalker/mods/18) (Nexus package version 1.3).
 - [Mod Setting Menu 1.0.6 or later](https://www.nexusmods.com/thebloodofdawnwalker/mods/271) for the in-game controls and immediate Apply.
 
 ## Installation
@@ -78,7 +78,7 @@ Last-attacker requests use the same interval and check only that attacker within
 
 See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
 
-Startup checks the native functions, camera table and patch sites used by this mod. It does not require a particular executable-file hash or storefront. If required game code differs, the mod stops before installing hooks and logs the failing address in `UE4SS.log`. The Framecore 2b library requirement remains separate.
+Startup checks the native functions, camera table and patch sites used by this mod. It does not require a particular executable-file hash or storefront. If required game code differs, the mod stops before installing hooks and logs the failing address in `UE4SS.log`. The supported UE4SS C++ interface is checked separately.
 
 Smooth tracking runs within the native view-rotation update on the game thread, before the game's camera modifiers and rotation limits. It uses only the selected target, with at most one aim-point query and two camera getters per eligible update. It adds no target searches or settings polling. Free, Native and unlocked states skip the tracking helper.
 

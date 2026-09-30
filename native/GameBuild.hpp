@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 namespace CombatCamera::Build {
-inline constexpr char hostHash[]="fb1839ee91f71f83d508d44a2763a15ac1bb0c5fb4e504ac0fcfca64376a054a";
 inline constexpr uintptr_t Tick=0x16ecdb8;
 inline constexpr uintptr_t Switch=0x5e1ff84;
 inline constexpr uintptr_t Picker=0x5dada54;

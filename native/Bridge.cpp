@@ -18,6 +18,7 @@
 #include "Bridge.hpp"
 #include "GameBuild.hpp"
 #include "GameCode.hpp"
+#include "HostCompatibility.hpp"
 
 extern "C" {
     void CameraGate(); void ConeGate(); void ForwardGate();
@@ -707,22 +708,6 @@ InputValue* modify(void* modifier,InputValue* result,void* input,const InputValu
     if(settings.debugLogging)++metrics.assist;
     return output;
 }
-bool hashFile(const std::filesystem::path& path,const char* expected) {
-    std::ifstream input(path,std::ios::binary);if(!input)return false;
-    BCRYPT_ALG_HANDLE algorithm{};BCRYPT_HASH_HANDLE hash{};bool good=false;
-    if(BCryptOpenAlgorithmProvider(&algorithm,BCRYPT_SHA256_ALGORITHM,nullptr,0)<0)return false;
-    if(BCryptCreateHash(algorithm,&hash,nullptr,0,nullptr,0,0)>=0){
-        std::array<char,65536> buffer;bool valid=true;
-        while(input){input.read(buffer.data(),buffer.size());if(BCryptHashData(hash,reinterpret_cast<PUCHAR>(buffer.data()),static_cast<ULONG>(input.gcount()),0)<0){valid=false;break;}}
-        std::array<unsigned char,32> digest{};
-        if(valid&&input.eof()&&BCryptFinishHash(hash,digest.data(),32,0)>=0){
-            constexpr char hex[]="0123456789abcdef";std::string actual;
-            for(auto b:digest){actual+=hex[b>>4];actual+=hex[b&15];}good=actual==expected;
-        }
-        BCryptDestroyHash(hash);
-    }
-    BCryptCloseAlgorithmProvider(algorithm,0);return good;
-}
 template<class Fn> void hook(uintptr_t rva,Fn detour,Fn& original) {
     auto address=at<void*>(rva);
     if(MH_CreateHook(address,reinterpret_cast<void*>(detour),reinterpret_cast<void**>(&original))!=MH_OK)throw std::runtime_error("Hook creation failed");
@@ -799,11 +784,10 @@ void configure(Settings value) {
 void deactivate(){active=false;cameraOwner.store(nullptr,std::memory_order_release);}
 bool start(std::wstring& error) {
     if(attempted){error=startError;return installed.load();}attempted=true;gameThread=GetCurrentThreadId();moduleBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
-    wchar_t path[32768]{};
     try{
+        if(HostCompatibility::identifyLoaded()==HostCompatibility::Runtime::Unsupported)
+            throw std::runtime_error("Unsupported UE4SS C++ interface; use Framecore 2b or Vercadi 1.2.1-rc6");
         NativeCompatibility::validateContract(moduleBase,Build::code,Build::pointers);
-        auto host=GetModuleHandleW(L"UE4SS.dll");
-        if(!host||!GetModuleFileNameW(host,path,32768)||!hashFile(path,Build::hostHash))throw std::runtime_error("Unsupported UE4SS build; use Framecore 2b");
         for(auto& site:Build::guards)if(!NativeCompatibility::accessible(moduleBase,site.rva,site.size,true)
             ||std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)
             throw std::runtime_error("Game code differs at hook RVA "+NativeCompatibility::location(site.rva)+"; no patches installed");

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Allow the native camera integration to start with Vercadi UE4SS RC6.
+
 ## 3.1.0
 
 - Added optional Lock to last attacker targeting: while already locked on, switch to the latest enemy whose attack hits you, including blocks and parries. Off by default and works with Free, Smooth and Native camera behavior.

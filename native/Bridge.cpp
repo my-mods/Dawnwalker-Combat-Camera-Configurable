@@ -18,7 +18,6 @@
 #include "Bridge.hpp"
 #include "GameBuild.hpp"
 #include "GameCode.hpp"
-#include "HostCompatibility.hpp"
 
 extern "C" {
     void CameraGate(); void ConeGate(); void ForwardGate();
@@ -785,8 +784,6 @@ void deactivate(){active=false;cameraOwner.store(nullptr,std::memory_order_relea
 bool start(std::wstring& error) {
     if(attempted){error=startError;return installed.load();}attempted=true;gameThread=GetCurrentThreadId();moduleBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     try{
-        if(HostCompatibility::identifyLoaded()==HostCompatibility::Runtime::Unsupported)
-            throw std::runtime_error("Unsupported UE4SS C++ interface; use Framecore 2b or Vercadi 1.2.1-rc6");
         NativeCompatibility::validateContract(moduleBase,Build::code,Build::pointers);
         for(auto& site:Build::guards)if(!NativeCompatibility::accessible(moduleBase,site.rva,site.size,true)
             ||std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)

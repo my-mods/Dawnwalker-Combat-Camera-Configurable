@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Allow the native camera integration to start with Vercadi UE4SS RC6.
+- Remove loader-fingerprint restrictions so compatible UE4SS builds can start the native camera integration.
 
 ## 3.1.0
 

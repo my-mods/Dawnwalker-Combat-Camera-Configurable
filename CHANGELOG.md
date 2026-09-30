@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Restore ability-wheel targeting while unlocked, selecting an eligible enemy toward the camera without enabling combat lock.
+- Allow unlocked abilities to cast without automatic targeting when their native rules accept a self-centered cast. Select an enemy only for abilities that require a primary target, without enabling combat lock.
 - Remove loader-fingerprint restrictions so compatible UE4SS builds can start the native camera integration.
 
 ## 3.1.0

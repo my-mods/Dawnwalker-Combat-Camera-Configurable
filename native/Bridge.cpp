@@ -89,6 +89,9 @@ void Session::OnUObjectArrayShutdown() {
     if(listening){FUObjectArray::RemoveUObjectDeleteListener(this);listening=false;}
 }
 Identity ownerId,castLockId,assistTargetId,pendingId;
+// Shared only by on-demand enemy checks, with indexed lifetime validation.
+Identity abilityTargetId,abilityActorId;
+uint64_t abilityQueryAt{};bool abilityQueried{};
 Identity trackingTargetId,trackingActorId;
 Tracking tracking;
 bool nativeCamera{};
@@ -150,6 +153,7 @@ void* resolveAttacker(const Identity& id) {
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
     attackerSelectionInvalidated=true;
+    abilityTargetId={};abilityActorId={};abilityQueried=false;
     cameraInitialized=false;
     nativeCamera=false;clearTracking();clearRecovery();clearAttacker();
     cameraOwner.store(nullptr,std::memory_order_release);
@@ -228,9 +232,9 @@ using ReactToHit=void(*)(void*,void*,void*,void*);ReactToHit originalReactToHit{
 using Script=void(*)(void*,void*,void*);Script originalLockScript{},originalSwitchScript{};
 using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
 SetTarget originalAttackTarget{};
-struct NativeWeak {int index{},serial{};};static_assert(sizeof(NativeWeak)==8);
-using GetLockTarget=NativeWeak*(*)(void*,NativeWeak*);GetLockTarget originalGetLockTarget{};
-using FocusEnter=void(*)(void*);FocusEnter originalFocusEnter{};
+using CanAbility=bool(*)(void*,void*,void*,uint8_t*,bool*);CanAbility originalCanAbility{};
+using PlanAbility=bool(*)(void*,void*);PlanAbility originalPlanAbility{};
+using FocusActor=void*(*)(void*);FocusActor originalFocusActor{};
 using Draw=void(*)(void*);Draw originalDraw{};
 struct InputValue{Vec3 value;int type;int padding;};static_assert(sizeof(InputValue)==32);
 using Modify=InputValue*(*)(void*,InputValue*,void*,const InputValue*,float);Modify originalModify{};
@@ -248,12 +252,12 @@ struct TemporaryLoss {void* combat;float duration;};
 thread_local const TemporaryLoss* temporaryLoss{};
 thread_local void* recovering{};
 thread_local void* attackerSelecting{};
-// Synchronous, capture-only ability query. Never publish a combat target or
-// change the player's lock intent while the native ability wheel initializes.
+// Capture-only selection, requested only after an ability needs an enemy.
 struct FocusQuery {void* combat;Identity target;};
 thread_local FocusQuery* focusQuery{};
-struct FocusEntry {void* combat;NativeWeak target{};bool queried{};};
-thread_local FocusEntry* focusEntry{};
+struct AbilityPlan {void* focus;Identity actor;};
+thread_local AbilityPlan* abilityPlan{};
+thread_local bool checkingAbility{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
     uint64_t lockChanges{},blockedTargets{};
@@ -617,31 +621,23 @@ void setTarget(void* combat,void* target) {
     originalSetTarget(combat,target);
     if(local){if(!target)clearTracking();managed(combat,true);}
 }
-void focusEnter(void* focus) {
-    // The component supplies its owner. No discovery and no retained UObject.
-    auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
-    auto combat=pawn?field<void*>(pawn,0xc90):nullptr;
-    FocusEntry entry{combat};
-    struct Restore {FocusEntry* previous;~Restore(){focusEntry=previous;}} restore{focusEntry};
-    focusEntry=managed(combat)&&!playerLocked?&entry:nullptr;
-    originalFocusEnter(focus);
+void* abilityCombat(void* pawn) {
+    if(!live()||!pawn)return nullptr;
+    syncSession();
+    auto combat=resolve(ownerId);
+    return combat&&field<void*>(combat,0xa8)==pawn&&managed(combat)&&!playerLocked&&
+        (field<uint8_t>(combat,0x8e)&0x10)&&!field<uint8_t>(combat,0x1612)?combat:nullptr;
 }
-NativeWeak* focusLockTarget(void* combat,NativeWeak* result) {
-    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
-    if((caller!=Build::FocusCheckReturn&&caller!=Build::FocusResolveReturn)||
-       !result||!focusEntry||focusEntry->combat!=combat)
-        return originalGetLockTarget(combat,result);
-    // The native wheel checks this weak reference, then reads it again. Both
-    // calls must return the same result without a second engine search.
-    if(focusEntry->queried){*result=focusEntry->target;return result;}
-    if(!managed(combat)||playerLocked)return originalGetLockTarget(combat,result);
-    focusEntry->queried=true;
-    struct Cache {NativeWeak* result;FocusEntry* entry;~Cache(){entry->target=*result;}} cache{result,focusEntry};
-    *result={};
-    if(inRequest||focusQuery||!(field<uint8_t>(combat,0x8e)&0x10)||field<uint8_t>(combat,0x1612))return result;
-    auto config=field<void*>(combat,0x9b8);if(!config)return result;
+void* abilityEnemy(void* combat) {
+    if(inRequest||focusQuery)return nullptr;
+    const auto now=GetTickCount64();
+    if(abilityQueried&&now-abilityQueryAt<50){
+        return resolve(abilityTargetId)?resolve(abilityActorId):nullptr;
+    }
+    abilityQueried=true;abilityQueryAt=now;abilityTargetId={};abilityActorId={};
+    auto config=field<void*>(combat,0x9b8);if(!config)return nullptr;
     const float distance=field<float>(config,0x26c);
-    if(!std::isfinite(distance)||distance<=0||distance>=1000000)return result;
+    if(!std::isfinite(distance)||distance<=0||distance>=1000000)return nullptr;
     const auto before=settings.debugLogging?clockMicros():0;
     if(settings.debugLogging)++metrics.focusQueries;
     FocusQuery query{combat,{}};
@@ -652,15 +648,63 @@ NativeWeak* focusLockTarget(void* combat,NativeWeak* result) {
     } restore{selecting,inRequest,automaticRequest,fallbackRequest,focusQuery};
     selecting=combat;inRequest=true;automaticRequest=false;fallbackRequest=false;focusQuery=&query;
     originalSwitch(combat,2,distance,false,false,false,false,false);
-    // All references are resolved in this call. A nonzero serial was assigned
-    // by the native selector; never allocate one through the host's weak API.
     syncSession();
-    if(live()&&owner==ownerId&&!playerLocked&&query.target.serial>0&&resolve(query.target)){
-        result->index=query.target.index;result->serial=query.target.serial;
-        if(settings.debugLogging)++metrics.focusTargets;
+    void* actor{};
+    if(live()&&owner==ownerId&&!playerLocked&&query.target.serial>0){
+        if(auto target=resolve(query.target)){
+            auto actorId=identity(field<void*>(target,0xa8));
+            if(actorId.address){abilityTargetId=query.target;abilityActorId=actorId;actor=resolve(actorId);}
+        }
     }
-    if(settings.debugLogging)metrics.focusMicros+=clockMicros()-before;
-    return result;
+    if(settings.debugLogging){if(actor)++metrics.focusTargets;metrics.focusMicros+=clockMicros()-before;}
+    return actor;
+}
+// Try the native no-target reference first. The same level/type dispatch
+// used by CanBeActivated distinguishes Self (1) from Single/All/AoE (0/2/3).
+// Those three types reject their owner as a primary target in native code.
+bool routeAbility(void* ability,void* pawn,void* combat,uint8_t* reason,bool* detail,void*& target) {
+    const auto supplied=target;
+    target=pawn;
+    const bool initialDetail=detail?*detail:false;
+    const bool accepted=originalCanAbility(ability,pawn,pawn,reason,detail);
+    if(accepted)return true;
+    if(!abilityCombat(pawn)||resolve(ownerId)!=combat)return false;
+    const int level=method<int(*)(void*,void*)>(ability,0x4e0)(ability,pawn);
+    const auto type=method<uint8_t(*)(void*,int)>(ability,0x540)(ability,level);
+    if(type!=0&&type!=2&&type!=3)return false;
+    target=supplied&&supplied!=pawn?supplied:abilityEnemy(combat);
+    if(!target)return false;
+    if(detail)*detail=initialDetail;
+    return originalCanAbility(ability,pawn,target,reason,detail);
+}
+bool canAbility(void* ability,void* pawn,void* target,uint8_t* reason,bool* detail) {
+    auto combat=abilityCombat(pawn);
+    if(!ability||!reason||!combat||checkingAbility)
+        return originalCanAbility(ability,pawn,target,reason,detail);
+    struct Restore {bool previous;~Restore(){checkingAbility=previous;}} restore{checkingAbility};
+    checkingAbility=true;
+    void* chosen=target;return routeAbility(ability,pawn,combat,reason,detail,chosen);
+}
+void* focusActor(void* focus) {
+    if(live()&&abilityPlan&&abilityPlan->focus==focus)return resolve(abilityPlan->actor);
+    return originalFocusActor(focus);
+}
+bool planAbility(void* focus,void* ability) {
+    auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
+    auto combat=abilityCombat(pawn);
+    // Respect specialised native activation overrides rather than calling a
+    // base validator on an unknown ability implementation.
+    if(!ability||!combat||checkingAbility||field<uint8_t>(focus,0x270)!=0||
+       method<CanAbility>(ability,0x4d0)!=at<CanAbility>(Build::CanAbility))
+        return originalPlanAbility(focus,ability);
+    struct Restore {bool checking;AbilityPlan* plan;~Restore(){checkingAbility=checking;abilityPlan=plan;}} restore{checkingAbility,abilityPlan};
+    checkingAbility=true;
+    uint8_t reason{};bool detail{};void* target=originalFocusActor(focus);
+    if(!routeAbility(ability,pawn,combat,&reason,&detail,target))return false;
+    AbilityPlan plan{focus,identity(target)};
+    if(!plan.actor.address||!abilityCombat(pawn))return false;
+    abilityPlan=&plan;
+    return originalPlanAbility(focus,ability);
 }
 void loseLock(void* combat,void* target,float duration) {
     const TemporaryLoss loss{combat,duration};const auto previous=temporaryLoss;
@@ -833,6 +877,7 @@ void configure(Settings value) {
     // Camera/targeting Apply preserves the explicit lock-button choice.
     if(cameraChanged){cameraInitialized=false;clearTracking();if(recoveryRemaining)clearAttackerHeld();clearRecovery();}
     if(!settings.enabled)clearSession();
+    abilityQueried=false;abilityTargetId={};abilityActorId={};
     dwell.clear();nextFallback=false;assistScale=1;assistAt=0;
     metrics={};active=installed.load()&&settings.enabled&&inputSupported;
     if(cameraChanged&&live()){
@@ -871,8 +916,9 @@ bool start(std::wstring& error) {
         hook(Build::LoseLock,&loseLock,originalLoseLock);
         hook(Build::ReactToHit,&reactToHit,originalReactToHit);
         if(focusSupported){
-            hook(Build::GetLockTarget,&focusLockTarget,originalGetLockTarget);
-            hook(Build::FocusEnter,&focusEnter,originalFocusEnter);
+            hook(Build::CanAbility,&canAbility,originalCanAbility);
+            hook(Build::PlanAbility,&planAbility,originalPlanAbility);
+            hook(Build::FocusActor,&focusActor,originalFocusActor);
         }
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);

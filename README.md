@@ -8,7 +8,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 - **Smooth Tracking Camera:** Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength.
 - **Native Tracking Camera:** Use the game's normal target tracking speed.
 - Fight without a selected target until you press the normal target-lock button. Unlocked attacks follow the camera's horizontal heading even when the character faces elsewhere. Blocking keeps the game's incoming-direction checks.
-- Open the ability wheel while unlocked to aim targeted abilities at an eligible enemy toward the camera. This does not turn combat lock on; normal ability costs, cooldowns and target requirements still apply.
+- Use abilities while unlocked. Self-centered abilities cast without automatic enemy selection. Abilities that require a primary enemy, including target-dependent area attacks, select an eligible enemy toward the camera. Normal costs, cooldowns and target requirements still apply; combat lock stays off.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
 - Optionally **Lock to last attacker** after a hit, block or parry while already locked on. This is Off by default and works with every camera behavior.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
@@ -48,15 +48,15 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | --- | --- | --- |
 | Enable mod | On | Off / On |
 | Camera behavior | Free | Free / Smooth tracking / Native tracking |
-| Tracking speed | 50% | 10–100%, in 5% steps; Smooth only |
-| Tracking resume delay | 750 ms | 0–3000 ms, in 250 ms steps; Smooth only |
+| Tracking speed | 50% | 10â€“100%, in 5% steps; Smooth only |
+| Tracking resume delay | 750 ms | 0â€“3000 ms, in 250 ms steps; Smooth only |
 | Camera-directed targeting | On | Off / On |
 | Lock to last attacker | Off | Off / On; requires active target lock |
-| Target switch delay | 65 ms | 0–1000 ms |
-| Targeting cone | 45° | 1–90°; 0 uses the native cone |
+| Target switch delay | 65 ms | 0â€“1000 ms |
+| Targeting cone | 45Â° | 1â€“90Â°; 0 uses the native cone |
 | Center dot | Off | Off / Weapon drawn / Always in gameplay |
 | Controller aim slowdown | On | Off / On |
-| Slowdown strength | 35% | 0–80% |
+| Slowdown strength | 35% | 0â€“80% |
 | Logging | Off | Off / On |
 
 Smooth tracking starts from the current view and eases toward the target without snapping. After manual camera movement, it waits for the resume delay (750 ms is 0.75 seconds) and eases back in over 200 ms. Tracking speed controls the mod's automatic turn strength, not a percentage of native tracking speed. At 50%, its maximum combined turn rate is 90 degrees per second.
@@ -87,6 +87,6 @@ Unlocked attack direction uses camera yaw, so looking up or down keeps attacks h
 
 ## Credits
 
-Inspired by [Free Combat Camera – Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340) by xxxxxMIKxxxxx. This is an independent implementation: no code from the original mod was copied or reused. The original mod is not required, and its DLL, configuration and bootstrap are not included.
+Inspired by [Free Combat Camera â€“ Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340) by xxxxxMIKxxxxx. This is an independent implementation: no code from the original mod was copied or reused. The original mod is not required, and its DLL, configuration and bootstrap are not included.
 
 Thanks to the UE4SS contributors, the Dawnwalker Framecore maintainers, the Mod Setting Menu author for the documented Apply client, and Tsuda Kageyu and contributors for MinHook. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

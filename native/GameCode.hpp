@@ -3,10 +3,15 @@
 #pragma once
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
-// Optional ability-wheel query: only its getter and native entry function.
-inline constexpr std::array<NativeCompatibility::Code,2> focusCode{{
-{0x5e13f30,188,"6e069c325f42bf61b01d2190afb145c8f68c2cfc9cfbf5901f718dae9723ef3a"},
-{0x5dfce98,645,"cfc2fdb875a7c3ebe75d59c6ed585c9d3d7e9181e9039893db82d344f3522fd8"},
+// Optional ability validation and native planning/getter consumers.
+inline constexpr std::array<NativeCompatibility::Code,7> focusCode{{
+{0x5d9e0c0,1453,"9e39fa04bec07cc6c5e6fce73c029188768795468a5d399ab06b3473d97bf53e"},
+{0x5e06dc8,858,"8f461a28fc40c9bb1456dcc74ce0ef2e78659ea8da5c550895a7f9b7b5b2d867"},
+{0x5df8810,50,"55bf6d3777464fe61765bf04ab01a96769bab3f617a2ee5117f093e92caf97a6"},
+{0x5df1580,870,"1a70d2a5c034f242ecf9819abdbed21c1d746f9887e1efd5cda10f8f8d6a55a6"},
+{0x5da09f4,104,"e2d3ca3241b1f386ae5ba3c370f24e7805fc84618be42469f1f42d1a39ff2bb0"},
+{0x5da34e4,17,"4257aa26275ca980d2c2fae71330b14e92296a6afe6a90613066c5949b614b03"},
+{0x5da2378,130,"adbd90ddccb920acfb8bfcb761a6a4c8140c5428f72523f7c788518060438887"},
 }};
 inline constexpr std::array<NativeCompatibility::Code,33> code{{
 {0x13512bc,317,"9b5feb9eca626d5851bb2351844a7da12720c9dc7528052b37bf28761cdb2aae"},

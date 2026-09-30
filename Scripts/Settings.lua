@@ -7,7 +7,7 @@ M.rules = {
     assistStrength={35,0,80}, debugLogging={0,0,1},
     cameraMode={0,0,2}, trackingSpeed={50,10,100}, trackingResumeMs={750,0,3000},
     lockLastAttacker={0,0,1},
-    autoLockOnHit={0,0,1}, afterTargetDeath={0,0,1},
+    autoLockOnHit={1,0,1}, afterTargetDeath={0,0,1},
 }
 function M.normalize(values)
     local out={}

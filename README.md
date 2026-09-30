@@ -11,7 +11,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 - Use abilities while unlocked. Self-centered abilities cast without automatic enemy selection. Abilities that require a primary enemy, including target-dependent area attacks, select an eligible enemy toward the camera when cast, ignoring any old ability target. Normal costs, cooldowns and target requirements still apply; combat lock stays off.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
 - Optionally **Lock to last attacker** after a hit, block or parry while already locked on. This is Off by default and works with every camera behavior.
-- Optionally **Automatic lock on hit** to acquire an attacker even while unlocked. **After target death** selects the nearest eligible enemy by default, or waits for the next hit. Smooth tracking keeps your chosen speed and manual-input behavior.
+- **Automatic lock on hit**, On by default, acquires an attacker even while unlocked. **After target death** selects the nearest eligible enemy by default, or waits for the next hit. Smooth tracking keeps your chosen speed and manual-input behavior.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
 - Add optional controller aim slowdown during camera-directed targeting. Fixed-target and untargeted modes keep full camera sensitivity. Mouse movement is excluded.
 - Choose camera behavior, tracking strength, resume delay, target selection, center dot and slowdown in Mod Setting Menu and press **Apply**. Preferences are saved for subsequent launches.
@@ -41,7 +41,7 @@ Camera behavior is independent of target selection. Free keeps the camera under 
 
 **Lock to last attacker** adds a priority to either locked targeting style. A hit, including a blocked or parried hit, switches to that attacker and gives them priority. With Camera-directed targeting On, move the camera toward another eligible enemy and hold aim for Target switch delay to choose them instead. Automatic tracking alone does not override the attacker. With Camera-directed targeting Off, camera movement keeps the attacker selected. The next attacker to hit you takes priority. Hits from behind do not need to pass the camera cone or target switch delay, but the enemy must still satisfy the game's range, visibility and target eligibility rules. An unavailable attacker leaves your current target alone. Unlocking cancels the priority; hits while unlocked only turn target lock on when Automatic lock on hit is enabled. Enabling the option starts listening for new hits and does not select an earlier attacker. Ordinary target loss releases the priority; Smooth tracking retains it during its supported temporary-disappearance recovery.
 
-**Automatic lock on hit** works independently of Lock to last attacker and is Off by default. Turn it On to lock onto any enemy whose attack hits you, including successful blocks and parries, then follow later attackers in the same way. Select **Smooth tracking** for gentle following; the option keeps your chosen camera behavior. Camera-directed targeting On also lets deliberate camera aiming override the held attacker; turn it Off to keep the enemy until another hit, target loss or manual unlock.
+**Automatic lock on hit** works independently of Lock to last attacker and is On by default. Lock onto any enemy whose attack hits you, including successful blocks and parries, then follow later attackers in the same way. Select **Smooth tracking** for gentle following; the option keeps your chosen camera behavior. Camera-directed targeting On also lets deliberate camera aiming override the held attacker; turn it Off to keep the enemy until another hit, target loss or manual unlock.
 
 With Automatic lock on hit On, **After target death** defaults to **Nearest enemy**. When the locked target dies, select the nearest eligible enemy in native targeting range, including behind you. Distance is measured from your character to each enemy's target point. If none qualifies, or you choose **Wait for next hit**, stay unlocked until another hit, block or parry, or use the lock button yourself. Native range, eligibility and visibility rules remain. Manual unlock cancels pending acquisition; a later incoming hit may lock again. Ordinary target loss and supported temporary disappearance keep their existing behavior.
 
@@ -62,7 +62,7 @@ Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls 
 | Center dot | Off | Off / Weapon drawn / Always in gameplay |
 | Controller aim slowdown | On | Off / On |
 | Slowdown strength | 35% | 0Ã¢â‚¬â€œ80% |
-| Automatic lock on hit | Off | Off / On |
+| Automatic lock on hit | On | Off / On |
 | After target death | Nearest enemy | Nearest enemy / Wait for next hit; Automatic lock on hit only |
 | Logging | Off | Off / On |
 
@@ -72,7 +72,7 @@ When an enemy temporarily breaks target lock to disappear, Smooth tracking waits
 
 The saved camera keys are `cameraMode` (0 Free, 1 Smooth, 2 Native), `trackingSpeed` and `trackingResumeMs`. Older `freeCamera` preferences remain readable but do not control camera behavior. Missing camera preferences start with Free, 50% and 750 ms while existing preferences are retained.
 
-The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferences receive the missing key with value 0. Changing this option with Apply preserves your lock state; turning it Off releases its targeting priority. Automatic lock on hit (`autoLockOnHit`, 0 Off / 1 On) also enables attacker priority. Its death choice is `afterTargetDeath` (0 Nearest enemy / 1 Wait for next hit). Missing keys default to 0 without replacing existing preferences.
+The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferences receive the missing key with value 0. Changing this option with Apply preserves your lock state; turning it Off releases its targeting priority. Automatic lock on hit (`autoLockOnHit`, 0 Off / 1 On) also enables attacker priority and defaults to 1. Its death choice is `afterTargetDeath` (0 Nearest enemy / 1 Wait for next hit), defaulting to 0. Missing keys receive these defaults without replacing existing preferences, including an explicitly saved Off choice.
 
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 

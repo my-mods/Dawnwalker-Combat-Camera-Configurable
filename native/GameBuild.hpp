@@ -3,6 +3,10 @@
 #include <array>
 #include <cstdint>
 namespace CombatCamera::Build {
+inline constexpr uintptr_t FocusEnter=0x5dfce98;
+inline constexpr uintptr_t GetLockTarget=0x5e13f30;
+inline constexpr uintptr_t FocusCheckReturn=0x5dfcfb0;
+inline constexpr uintptr_t FocusResolveReturn=0x5dfcfd0;
 inline constexpr uintptr_t Tick=0x16ecdb8;
 inline constexpr uintptr_t Switch=0x5e1ff84;
 inline constexpr uintptr_t Picker=0x5dada54;

@@ -3,6 +3,11 @@
 #pragma once
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
+// Optional ability-wheel query: only its getter and native entry function.
+inline constexpr std::array<NativeCompatibility::Code,2> focusCode{{
+{0x5e13f30,188,"6e069c325f42bf61b01d2190afb145c8f68c2cfc9cfbf5901f718dae9723ef3a"},
+{0x5dfce98,645,"cfc2fdb875a7c3ebe75d59c6ed585c9d3d7e9181e9039893db82d344f3522fd8"},
+}};
 inline constexpr std::array<NativeCompatibility::Code,33> code{{
 {0x13512bc,317,"9b5feb9eca626d5851bb2351844a7da12720c9dc7528052b37bf28761cdb2aae"},
 {0x1600d80,286,"1ffad61665f8f7250b7aebe65d60fe68d5098f60fc8614f73d4e53e68d03954a"},

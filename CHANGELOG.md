@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restore ability-wheel targeting while unlocked, selecting an eligible enemy toward the camera without enabling combat lock.
 - Remove loader-fingerprint restrictions so compatible UE4SS builds can start the native camera integration.
 
 ## 3.1.0

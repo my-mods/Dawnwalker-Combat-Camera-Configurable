@@ -228,6 +228,9 @@ using ReactToHit=void(*)(void*,void*,void*,void*);ReactToHit originalReactToHit{
 using Script=void(*)(void*,void*,void*);Script originalLockScript{},originalSwitchScript{};
 using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
 SetTarget originalAttackTarget{};
+struct NativeWeak {int index{},serial{};};static_assert(sizeof(NativeWeak)==8);
+using GetLockTarget=NativeWeak*(*)(void*,NativeWeak*);GetLockTarget originalGetLockTarget{};
+using FocusEnter=void(*)(void*);FocusEnter originalFocusEnter{};
 using Draw=void(*)(void*);Draw originalDraw{};
 struct InputValue{Vec3 value;int type;int padding;};static_assert(sizeof(InputValue)==32);
 using Modify=InputValue*(*)(void*,InputValue*,void*,const InputValue*,float);Modify originalModify{};
@@ -245,6 +248,12 @@ struct TemporaryLoss {void* combat;float duration;};
 thread_local const TemporaryLoss* temporaryLoss{};
 thread_local void* recovering{};
 thread_local void* attackerSelecting{};
+// Synchronous, capture-only ability query. Never publish a combat target or
+// change the player's lock intent while the native ability wheel initializes.
+struct FocusQuery {void* combat;Identity target;};
+thread_local FocusQuery* focusQuery{};
+struct FocusEntry {void* combat;NativeWeak target{};bool queried{};};
+thread_local FocusEntry* focusEntry{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
     uint64_t lockChanges{},blockedTargets{};
@@ -252,6 +261,7 @@ struct Metrics {
     uint64_t trackingAttempts{},trackingSteps{},trackingMoves{},trackingInput{},trackingMicros{};
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{};
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerMicros{};
+    uint64_t focusQueries{},focusTargets{},focusMicros{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -268,6 +278,8 @@ void report(uint64_t now) {
         L" crosshair="+std::to_wstring(metrics.draw)+L" assist="+std::to_wstring(metrics.assist)+
         L" lockChanges="+std::to_wstring(metrics.lockChanges)+L" blockedTargets="+std::to_wstring(metrics.blockedTargets)+
         L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
+        L" focusQueries="+std::to_wstring(metrics.focusQueries)+L" focusTargets="+std::to_wstring(metrics.focusTargets)+
+        L" focusUs="+std::to_wstring(metrics.focusMicros)+
         L" directionUs="+std::to_wstring(metrics.directionMicros)+
         L" cameraMode="+std::to_wstring(settings.cameraMode)+L" trackingSteps="+std::to_wstring(metrics.trackingSteps)+
         L" viewChecks="+std::to_wstring(cameraMetrics.viewChecks.exchange(0))+L" viewOtherThread="+std::to_wstring(cameraMetrics.viewOtherThread.exchange(0))+
@@ -577,6 +589,9 @@ void* pick(void* context) {
     return originalPick(context)?previous:chosen;
 }
 void setTarget(void* combat,void* target) {
+    // SwitchLockTarget already performs native range, visibility and eligibility
+    // checks and assigns a native weak serial before calling this setter.
+    if(focusQuery&&focusQuery->combat==combat){focusQuery->target=identity(target);return;}
     const bool local=managed(combat);
     if(local){
         if(target&&(!playerLocked||selecting!=combat)){if(settings.debugLogging)++metrics.blockedTargets;return;}
@@ -601,6 +616,51 @@ void setTarget(void* combat,void* target) {
     }
     originalSetTarget(combat,target);
     if(local){if(!target)clearTracking();managed(combat,true);}
+}
+void focusEnter(void* focus) {
+    // The component supplies its owner. No discovery and no retained UObject.
+    auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
+    auto combat=pawn?field<void*>(pawn,0xc90):nullptr;
+    FocusEntry entry{combat};
+    struct Restore {FocusEntry* previous;~Restore(){focusEntry=previous;}} restore{focusEntry};
+    focusEntry=managed(combat)&&!playerLocked?&entry:nullptr;
+    originalFocusEnter(focus);
+}
+NativeWeak* focusLockTarget(void* combat,NativeWeak* result) {
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
+    if((caller!=Build::FocusCheckReturn&&caller!=Build::FocusResolveReturn)||
+       !result||!focusEntry||focusEntry->combat!=combat)
+        return originalGetLockTarget(combat,result);
+    // The native wheel checks this weak reference, then reads it again. Both
+    // calls must return the same result without a second engine search.
+    if(focusEntry->queried){*result=focusEntry->target;return result;}
+    if(!managed(combat)||playerLocked)return originalGetLockTarget(combat,result);
+    focusEntry->queried=true;
+    struct Cache {NativeWeak* result;FocusEntry* entry;~Cache(){entry->target=*result;}} cache{result,focusEntry};
+    *result={};
+    if(inRequest||focusQuery||!(field<uint8_t>(combat,0x8e)&0x10)||field<uint8_t>(combat,0x1612))return result;
+    auto config=field<void*>(combat,0x9b8);if(!config)return result;
+    const float distance=field<float>(config,0x26c);
+    if(!std::isfinite(distance)||distance<=0||distance>=1000000)return result;
+    const auto before=settings.debugLogging?clockMicros():0;
+    if(settings.debugLogging)++metrics.focusQueries;
+    FocusQuery query{combat,{}};
+    const auto owner=ownerId;
+    struct Restore {
+        void* selection;bool request,automatic,fallback;FocusQuery* query;
+        ~Restore(){selecting=selection;inRequest=request;automaticRequest=automatic;fallbackRequest=fallback;focusQuery=query;}
+    } restore{selecting,inRequest,automaticRequest,fallbackRequest,focusQuery};
+    selecting=combat;inRequest=true;automaticRequest=false;fallbackRequest=false;focusQuery=&query;
+    originalSwitch(combat,2,distance,false,false,false,false,false);
+    // All references are resolved in this call. A nonzero serial was assigned
+    // by the native selector; never allocate one through the host's weak API.
+    syncSession();
+    if(live()&&owner==ownerId&&!playerLocked&&query.target.serial>0&&resolve(query.target)){
+        result->index=query.target.index;result->serial=query.target.serial;
+        if(settings.debugLogging)++metrics.focusTargets;
+    }
+    if(settings.debugLogging)metrics.focusMicros+=clockMicros()-before;
+    return result;
 }
 void loseLock(void* combat,void* target,float duration) {
     const TemporaryLoss loss{combat,duration};const auto previous=temporaryLoss;
@@ -788,6 +848,12 @@ bool start(std::wstring& error) {
         for(auto& site:Build::guards)if(!NativeCompatibility::accessible(moduleBase,site.rva,site.size,true)
             ||std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)
             throw std::runtime_error("Game code differs at hook RVA "+NativeCompatibility::location(site.rva)+"; no patches installed");
+        bool focusSupported=true;
+        try{NativeCompatibility::validateContract(moduleBase,Build::focusCode,std::array<NativeCompatibility::Pointer,0>{});}
+        catch(const std::exception& failure){
+            focusSupported=false;const std::string reason=failure.what();
+            RC::Output::send(L"[CombatCamera] Unlocked ability targeting unavailable: "+std::wstring(reason.begin(),reason.end())+L". Camera features remain available.\n");
+        }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's FName constructor, resolved from the exact build. Stores
         // value IDs only and is called four times on the game thread at startup.
@@ -804,6 +870,10 @@ bool start(std::wstring& error) {
         hook(Build::Request,&nativeRequest,originalRequest);hook(Build::Lock,&lockTarget,originalLock);
         hook(Build::LoseLock,&loseLock,originalLoseLock);
         hook(Build::ReactToHit,&reactToHit,originalReactToHit);
+        if(focusSupported){
+            hook(Build::GetLockTarget,&focusLockTarget,originalGetLockTarget);
+            hook(Build::FocusEnter,&focusEnter,originalFocusEnter);
+        }
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);

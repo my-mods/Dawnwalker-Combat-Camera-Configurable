@@ -8,6 +8,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 - **Smooth Tracking Camera:** Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength.
 - **Native Tracking Camera:** Use the game's normal target tracking speed.
 - Fight without a selected target until you press the normal target-lock button. Unlocked attacks follow the camera's horizontal heading even when the character faces elsewhere. Blocking keeps the game's incoming-direction checks.
+- Open the ability wheel while unlocked to aim targeted abilities at an eligible enemy toward the camera. This does not turn combat lock on; normal ability costs, cooldowns and target requirements still apply.
 - While locked, select enemies toward the camera or keep your chosen enemy. Adjust the targeting cone and automatic switch delay.
 - Optionally **Lock to last attacker** after a hit, block or parry while already locked on. This is Off by default and works with every camera behavior.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.

@@ -11,6 +11,7 @@
 #include <MinHook.h>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <filesystem>
 #include <fstream>
 #include <cstring>
@@ -74,11 +75,19 @@ Identity identity(void* object) {
 }
 struct Session final:FUObjectDeleteListener {
     std::array<std::atomic_int,30> watched;
+    std::atomic_uint32_t riposteWatches{};
     std::atomic_uint32_t invalidated{};
     Session(){for(auto& x:watched)x.store(-1);}
     void NotifyUObjectDeleted(const UObjectBase*,int32_t index) override {
         uint32_t mask=0;
-        for(size_t i=0;i<watched.size();++i)if(watched[i].load(std::memory_order_relaxed)==index)mask|=1u<<i;
+        for(size_t i=0;i<14;++i)if(watched[i].load(std::memory_order_relaxed)==index)mask|=1u<<i;
+        // Published after the watch indices. Idle riposte state adds one atomic
+        // load, with no extra index scans during unrelated object destruction.
+        for(auto pending=riposteWatches.load(std::memory_order_acquire);pending;pending&=pending-1){
+            const auto slot=14+std::countr_zero(pending)*2;
+            if(watched[slot].load(std::memory_order_relaxed)==index)mask|=1u<<slot;
+            if(watched[slot+1].load(std::memory_order_relaxed)==index)mask|=1u<<(slot+1);
+        }
         if(mask&1)cameraOwner.store(nullptr,std::memory_order_release);
         if(mask)invalidated.fetch_or(mask,std::memory_order_release);
     }
@@ -97,24 +106,25 @@ Identity ownerId,castLockId,assistTargetId,pendingId;
 struct Riposte {Identity combat,stub;double remaining{};uint8_t block{};uint64_t sequence{};};
 std::array<Riposte,8> ripostes{};
 uint64_t riposteSequence{};
-bool hasRipostes{};
+uint32_t riposteMask{};
 void clearRiposte(size_t i) {
-    ripostes[i]={};session.watched[14+i*2]=-1;session.watched[15+i*2]=-1;
+    riposteMask&=~(1u<<i);
+    session.riposteWatches.store(riposteMask,std::memory_order_release);
+    ripostes[i]={};
+    session.watched[14+i*2].store(-1,std::memory_order_relaxed);
+    session.watched[15+i*2].store(-1,std::memory_order_relaxed);
 }
 void clearRipostes() {
-    if(!hasRipostes)return;
-    for(size_t i=0;i<ripostes.size();++i)clearRiposte(i);
-    hasRipostes=false;
+    while(riposteMask)clearRiposte(std::countr_zero(riposteMask));
 }
 void expireRipostes(void* combat,float delta) {
-    if(!hasRipostes)return;
+    if(!riposteMask)return;
     if(!std::isfinite(delta)||delta<0||!(field<uint8_t>(combat,0x8e)&0x10)||field<uint8_t>(combat,0xb28)==11){clearRipostes();return;}
-    hasRipostes=false;
-    for(size_t i=0;i<ripostes.size();++i){
+    for(auto pending=riposteMask;pending;pending&=pending-1){
+        const auto i=std::countr_zero(pending);
         auto& entry=ripostes[i];
-        if(!entry.remaining)continue;
         if(delta>=entry.remaining)clearRiposte(i);
-        else{entry.remaining-=delta;hasRipostes=true;}
+        else entry.remaining-=delta;
     }
 }
 // Shared only by on-demand enemy checks, with indexed lifetime validation.
@@ -513,11 +523,14 @@ void riposteUnavailable(const std::wstring& reason) {
     RC::Output::send(L"[CombatCamera] Riposte direction unavailable: "+reason+L". Using vanilla openings; camera features remain available.\n");
 }
 void rememberRiposte(void* combat,void* attack,void* response) {
-    if(!riposteSupported||!settings.riposteDirection||!attack||!managed(combat)||!(field<uint8_t>(combat,0x8e)&0x10))return;
+    // ReactToHit shares its validated player context with attacker tracking.
     auto target=field<void*>(attack,0x28);
     // Another reaction from this enemy replaces its old pending parry, even
     // when this hit was an ordinary block, omniblock or an unguarded hit.
-    for(size_t i=0;i<ripostes.size();++i)if(ripostes[i].combat.address==reinterpret_cast<uintptr_t>(target))clearRiposte(i);
+    for(auto pending=riposteMask;pending;pending&=pending-1){
+        const auto i=std::countr_zero(pending);
+        if(ripostes[i].combat.address==reinterpret_cast<uintptr_t>(target))clearRiposte(i);
+    }
     const auto block=field<uint8_t>(combat,0x960);
     auto parry=field<void*>(combat,0x268);
     if(!target||target==combat||!response||!parry||field<void*>(response,0)!=parry||riposteSide(block,settings.riposteDirection)<0)return;
@@ -528,8 +541,11 @@ void rememberRiposte(void* combat,void* attack,void* response) {
         if(!ripostes[i].remaining){slot=i;break;}
         if(ripostes[i].sequence<ripostes[slot].sequence)slot=i;
     }
-    ripostes[slot]={targetId,stubId,1.0,block,++riposteSequence};hasRipostes=true;
-    session.watched[14+slot*2]=targetId.index;session.watched[15+slot*2]=stubId.index;
+    ripostes[slot]={targetId,stubId,1.0,block,++riposteSequence};
+    session.watched[14+slot*2].store(targetId.index,std::memory_order_relaxed);
+    session.watched[15+slot*2].store(stubId.index,std::memory_order_relaxed);
+    riposteMask|=1u<<slot;
+    session.riposteWatches.store(riposteMask,std::memory_order_release);
     if(settings.debugLogging)++metrics.riposteParries;
 }
 bool riposteGraph(void* frame) {
@@ -562,17 +578,15 @@ bool riposteGraph(void* frame) {
     }
     return true;
 }
-void riposteQuery(void* combat,void* frame,void* result) {
-    originalRiposteQuery(combat,frame,result);
-    if(!live()||!riposteSupported||!settings.riposteDirection||!hasRipostes||!frame||!result||!managed(combat))return;
-    if(!riposteGraph(frame))return;
-    const auto before=settings.debugLogging?clockMicros():0;
+void applyRiposte(void* combat,void* frame,void* result) {
+    if(!managed(combat)||!riposteMask||!riposteGraph(frame))return;
     if(settings.debugLogging)++metrics.riposteQueries;
     auto task=field<void*>(frame,0x18),stub=field<void*>(task,0x28);
     bool applied=false;
-    for(size_t i=0;i<ripostes.size();++i){
+    for(auto pending=riposteMask;pending;pending&=pending-1){
+        const auto i=std::countr_zero(pending);
         const auto entry=ripostes[i];
-        if(!entry.remaining||entry.stub.address!=reinterpret_cast<uintptr_t>(stub))continue;
+        if(entry.stub.address!=reinterpret_cast<uintptr_t>(stub))continue;
         auto enemy=resolveAttacker(entry.combat);
         const bool valid=enemy&&resolveAttacker(entry.stub)==stub&&field<void*>(enemy,0x1070)==stub&&field<uint8_t>(enemy,0xb28)!=10;
         clearRiposte(i); // Consume before publishing; repeated queries stay native.
@@ -582,35 +596,48 @@ void riposteQuery(void* combat,void* frame,void* result) {
     }
     if(settings.debugLogging){
         if(applied)++metrics.riposteApplied;else ++metrics.riposteMisses;
-        metrics.riposteMicros+=clockMicros()-before;
     }
 }
+void riposteQuery(void* combat,void* frame,void* result) {
+    originalRiposteQuery(combat,frame,result);
+    if(!live()||!riposteSupported||!settings.riposteDirection||!riposteMask||!frame||!result)return;
+    const auto before=settings.debugLogging?clockMicros():0;
+    applyRiposte(combat,frame,result);
+    // Include context and bytecode validation, not just the final record lookup.
+    if(settings.debugLogging)metrics.riposteMicros+=clockMicros()-before;
+}
 bool queueAttack(void* combat,void* tags) {
+    if(!live()||!riposteMask||ownerId.address!=reinterpret_cast<uintptr_t>(combat))return originalQueueAttack(combat,tags);
     const auto sequence=riposteSequence;
     const auto result=originalQueueAttack(combat,tags);
-    if(result&&live()&&hasRipostes&&ownerId.address==reinterpret_cast<uintptr_t>(combat)&&sequence==riposteSequence)clearRipostes();
+    if(result&&live()&&riposteMask&&ownerId.address==reinterpret_cast<uintptr_t>(combat)&&sequence==riposteSequence)clearRipostes();
     return result;
 }
 void onDodge(void* combat,void* direction) {
-    if(live()&&hasRipostes&&ownerId.address==reinterpret_cast<uintptr_t>(combat))clearRipostes();
+    if(live()&&riposteMask&&ownerId.address==reinterpret_cast<uintptr_t>(combat))clearRipostes();
     originalOnDodge(combat,direction);
 }
 void reactToHit(void* combat,void* animation,void* attack,void* response) {
     // Arm before the original: the native reaction can create the opening
     // synchronously. Only the native parry action is accepted.
-    if(live())rememberRiposte(combat,attack,response);
     // PlayerCombatComponent::ReactToHit: R8 is InAttackData, whose +0x28
     // owns the attacker's combat component. Native reactions include block,
     // parry and omniblock. No health-loss threshold or borrowed struct survives.
-    if(live()&&(settings.lockLastAttacker||settings.autoLockOnHit)&&attack&&managed(combat)&&
-       (playerLocked||settings.autoLockOnHit)&&(field<uint8_t>(combat,0x8e)&0x10)){
-        auto target=field<void*>(attack,0x28);const auto targetId=identity(target);
-        auto actor=targetId.address?field<void*>(target,0xa8):nullptr;const auto actorId=identity(actor);
-        if(targetId.address&&actorId.address&&target!=combat&&actor!=field<void*>(combat,0xa8)){
-            clearDeath();clearAttackerLook();nextFallback=false;
-            attackerPendingTargetId=targetId;attackerPendingActorId=actorId;attackerRemaining=1.0;
-            session.watched[8]=targetId.index;session.watched[9]=actorId.index;
-            if(settings.debugLogging)++metrics.attackerHits;
+    if(live()&&attack){
+        const bool riposte=riposteSupported&&settings.riposteDirection;
+        const bool attacker=settings.lockLastAttacker||settings.autoLockOnHit;
+        if((riposte||attacker)&&managed(combat)&&(field<uint8_t>(combat,0x8e)&0x10)){
+            if(riposte)rememberRiposte(combat,attack,response);
+            if(attacker&&(playerLocked||settings.autoLockOnHit)){
+                auto target=field<void*>(attack,0x28);const auto targetId=identity(target);
+                auto actor=targetId.address?field<void*>(target,0xa8):nullptr;const auto actorId=identity(actor);
+                if(targetId.address&&actorId.address&&target!=combat&&actor!=field<void*>(combat,0xa8)){
+                    clearDeath();clearAttackerLook();nextFallback=false;
+                    attackerPendingTargetId=targetId;attackerPendingActorId=actorId;attackerRemaining=1.0;
+                    session.watched[8]=targetId.index;session.watched[9]=actorId.index;
+                    if(settings.debugLogging)++metrics.attackerHits;
+                }
+            }
         }
     }
     originalReactToHit(combat,animation,attack,response);

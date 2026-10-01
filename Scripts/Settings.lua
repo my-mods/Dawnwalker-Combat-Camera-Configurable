@@ -1,6 +1,6 @@
 -- Combat Camera - Configurable. MIT.
 local M = {}
-M.order = {"enabled", "freeCamera", "targeting", "crosshair", "delayMs", "coneDegrees", "aimAssist", "assistStrength", "debugLogging", "cameraMode", "trackingSpeed", "trackingResumeMs", "lockLastAttacker", "autoLockOnHit", "afterTargetDeath"}
+M.order = {"enabled", "freeCamera", "targeting", "crosshair", "delayMs", "coneDegrees", "aimAssist", "assistStrength", "debugLogging", "cameraMode", "trackingSpeed", "trackingResumeMs", "lockLastAttacker", "autoLockOnHit", "afterTargetDeath", "trackingCatchup"}
 M.rules = {
     enabled={1,0,1}, freeCamera={1,0,1}, targeting={1,0,1}, crosshair={0,0,2},
     delayMs={65,0,1000}, coneDegrees={45,0,90}, aimAssist={1,0,1},
@@ -8,6 +8,7 @@ M.rules = {
     cameraMode={0,0,2}, trackingSpeed={50,10,100}, trackingResumeMs={750,0,3000},
     lockLastAttacker={0,0,1},
     autoLockOnHit={1,0,1}, afterTargetDeath={0,0,1},
+    trackingCatchup={300,100,500},
 }
 function M.normalize(values)
     local out={}

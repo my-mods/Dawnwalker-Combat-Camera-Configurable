@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Recover the same tracked enemy after temporary target clears or delayed reappearance, including behind the camera.
+- Add configurable smooth tracking catch-up, with an Off option and up to 2x-5x speed for large turns.
+
 ## 3.3.0
 
 - Automatically lock onto incoming attackers, including blocks and parries, and choose the nearest eligible enemy or wait for another hit after the target dies.

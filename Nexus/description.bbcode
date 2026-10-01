@@ -6,7 +6,7 @@ Choose a free camera, gentle target following or native tracking. Fight without 
 
 [list=1]
 [*][b][color=#A8D5C2]Free Camera:[/color][/b] Move the camera yourself, with no automatic enemy tracking. This is the default.
-[*][b][color=#A8D5C2]Smooth Tracking Camera:[/color][/b] Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength.
+[*][b][color=#A8D5C2]Smooth Tracking Camera:[/color][/b] Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength, and Tracking catch-up for faster turns when the enemy moves far from your camera's aim.
 [*][b][color=#A8D5C2]Native Tracking Camera:[/color][/b] Use the game's normal target tracking speed.
 [/list]
 Camera behavior is independent of target selection. Smooth and Native tracking require an active target lock and work with both camera-directed targeting and fixed enemy selection.
@@ -14,7 +14,7 @@ Camera behavior is independent of target selection. Smooth and Native tracking r
 [size=4][b][color=#E8C88A]Features[/color][/b][/size]
 
 [list]
-[*][b][color=#A8D5C2]Disappearing enemies:[/color][/b] Smooth tracking can recover the same enemy when the game restores targeting after a temporary disappearance, even behind the camera. Works with fixed-target and camera-directed selection; unlocking cancels recovery.
+[*][b][color=#A8D5C2]Disappearing enemies:[/color][/b] Smooth tracking briefly remembers a disappearing tracked enemy and retries recovery if it reappears late, including behind the camera. Recovery keeps native range and visibility checks and works with both targeting styles. Unlocking cancels it; mouse and right-stick movement still take priority.
 [*][b][color=#A8D5C2]Three targeting modes:[/color][/b] Select enemies by aiming the camera, keep one enemy selected, or fight with no target selected at all.
 [*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] An optional toggle, Off by default. While already locked on, switch to the last enemy whose attack hits you, including blocks and parries. With Camera-directed targeting On, move the camera toward another enemy and hold aim for Target switch delay to override the attacker. With it Off, hold that enemy until another attacker hits you, you unlock or the target is lost. Works with Free, Smooth and Native camera behavior.
 [*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire an incoming attacker even while unlocked, including blocks and parries. Keep Smooth tracking or your other chosen camera behavior. After the target dies, select the nearest eligible enemy by default, or wait for the next hit. Manual unlock cancels pending requests; a later hit can lock again.
@@ -38,6 +38,7 @@ Open Mod Settings, select [b]Combat Camera - Configurable[/b], adjust the contro
 [*][b][color=#A8D5C2]Camera behavior:[/color][/b] Free by default. Smooth tracking gently follows a locked enemy; Native tracking uses the game's normal tracking speed.
 [*][b][color=#A8D5C2]Tracking speed:[/color][/b] 50% by default, adjustable from 10% to 100% in 5% steps. Shown only for Smooth tracking. Controls automatic following independently of controller aim slowdown.
 [*][b][color=#A8D5C2]Tracking resume delay:[/color][/b] 750 ms (0.75 seconds) by default, adjustable from 0 to 3000 ms in 50 ms steps. Shown only for Smooth tracking. Manual camera movement pauses tracking, which then eases back in after this delay. With Camera-directed targeting On, keep this longer than Target switch delay and allow extra time for target selection so tracking does not pull you away before switching.
+[*][b][color=#A8D5C2]Tracking catch-up:[/color][/b] Up to 3x by default; choose Off or a maximum of 2x to 5x. Smooth tracking turns faster as the target moves farther from camera aim, increasing the boost from 45 to 180 degrees and easing back to normal near the target. Manual camera input still takes priority.
 [*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On selects enemies toward the camera while locked. Off retains your chosen enemy. Both choices work with all three camera behaviors.
 [*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority after a hit; deliberate camera aiming can override it when Camera-directed targeting is On. Hits while unlocked only turn target lock on when Automatic lock on hit is enabled. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.
 [*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.

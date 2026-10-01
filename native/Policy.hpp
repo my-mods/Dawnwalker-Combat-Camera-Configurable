@@ -15,6 +15,7 @@ struct Settings {
     bool lockLastAttacker{false};
     bool autoLockOnHit{true};
     int afterTargetDeath{0}; // 0: nearest eligible enemy, 1: wait for another hit.
+    int trackingCatchup{300}; // Maximum angular-error boost; 100 disables it.
 };
 struct Vec3 { double x{}, y{}, z{}; };
 inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
@@ -46,7 +47,7 @@ struct Tracking {
     double quiet{},ramp{};
     bool following{};
     void clear(){*this={};}
-    Vec3 step(Vec3 view,Vec3 desired,double delta,bool input,int speed,int resumeMs) {
+    Vec3 step(Vec3 view,Vec3 desired,double delta,bool input,int speed,int resumeMs,int catchup=100) {
         if(!finite(view)||!finite(desired)||!std::isfinite(delta)||delta<=0||delta>0.25){clear();return {};}
         if(input){quiet=0;ramp=0;following=false;return {};}
         delta=std::min(delta,0.05);
@@ -59,9 +60,14 @@ struct Tracking {
         const double before=ramp;ramp=std::min(0.2,ramp+activeDelta);
         // Integrate the linear 200ms engagement ramp, avoiding frame-rate drift.
         const double weighted=activeDelta-(ramp-before)+(ramp*ramp-before*before)/0.4;
-        const double s=std::clamp(speed,10,100)*0.01;
+        const Vec3 error{angleDelta(desired.x-view.x),angleDelta(desired.y-view.y),0};
+        // Preserve close following; smoothly increase responsiveness and the
+        // turn-rate cap from 45 degrees to the shortest half-turn (180 degrees).
+        const double t=std::clamp((std::hypot(error.x,error.y)-45.0)/135.0,0.0,1.0);
+        const double boost=1.0+(std::clamp(catchup,100,500)*0.01-1.0)*t*t*(3.0-2.0*t);
+        const double s=std::clamp(speed,10,100)*0.01*boost;
         const double alpha=-std::expm1(-8.0*s*weighted);
-        Vec3 correction{angleDelta(desired.x-view.x)*alpha,angleDelta(desired.y-view.y)*alpha,0};
+        Vec3 correction{error.x*alpha,error.y*alpha,0};
         const double length=std::hypot(correction.x,correction.y),limit=180.0*s*weighted;
         if(length>limit&&length>0){correction.x*=limit/length;correction.y*=limit/length;}
         return correction;

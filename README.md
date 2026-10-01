@@ -14,13 +14,13 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 - **Automatic lock on hit**, On by default, acquires an attacker even while unlocked. **After target death** selects the nearest eligible enemy by default, or waits for the next hit. Smooth tracking keeps your chosen speed and manual-input behavior.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
 - Add optional controller aim slowdown during camera-directed targeting. Fixed-target and untargeted modes keep full camera sensitivity. Mouse movement is excluded.
-- Choose camera behavior, tracking strength, resume delay, target selection, center dot and slowdown in Mod Setting Menu and press **Apply**. Preferences are saved for subsequent launches.
+- Choose camera behavior, tracking strength, resume delay, target selection, center dot and slowdown in Mod Setting Menu. Preferences are saved for subsequent launches.
 
 ## Requirements
 
 - The Blood of Dawnwalker for PC, with the native functions supported by the bundled integration. Reference build: **1.0.5 / Steam 25232147**.
 - A Dawnwalker-compatible UE4SS installation providing the imported C++ mod and Lua APIs. Framecore 2b and Vercadi RC6 are tested references; their version names and DLL hashes are not runtime restrictions.
-- [Mod Setting Menu 1.0.6 or later](https://www.nexusmods.com/thebloodofdawnwalker/mods/271) for the in-game controls and immediate Apply.
+- [Mod Setting Menu 1.0.6 or later](https://www.nexusmods.com/thebloodofdawnwalker/mods/271) for the in-game controls and live settings changes.
 
 ## Installation
 
@@ -37,7 +37,7 @@ Use **R3 / right-stick click**, or your configured keyboard/controller **target-
 | On | On | Select enemies toward the camera, using the configured cone and switch delay. |
 | On | Off | Keep the selected enemy until you unlock or the target is cleared. |
 
-Camera behavior is independent of target selection. Free keeps the camera under your control in all three states. Smooth tracking and Native tracking follow only while an enemy is locked; Smooth yields immediately when you move the camera. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing camera or targeting settings with Apply preserves your current lock state. Leaving combat or loading a new player starts untargeted.
+Camera behavior is independent of target selection. Free keeps the camera under your control in all three states. Smooth tracking and Native tracking follow only while an enemy is locked; Smooth yields immediately when you move the camera. To choose a different enemy in fixed-target mode, unlock, look toward the new enemy, and press target lock again. Moving the right stick does not cycle targets. Changing camera or targeting settings preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
 **Lock to last attacker** adds a priority to either locked targeting style. A hit, including a blocked or parried hit, switches to that attacker and gives them priority. With Camera-directed targeting On, move the camera toward another eligible enemy and hold aim for Target switch delay to choose them instead. Automatic tracking alone does not override the attacker. With Camera-directed targeting Off, camera movement keeps the attacker selected. The next attacker to hit you takes priority. Hits from behind do not need to pass the camera cone or target switch delay, but the enemy must still satisfy the game's range, visibility and target eligibility rules. An unavailable attacker leaves your current target alone. Unlocking cancels the priority; hits while unlocked only turn target lock on when Automatic lock on hit is enabled. Enabling the option starts listening for new hits and does not select an earlier attacker. Ordinary target loss releases the priority; Smooth tracking retains it during its supported temporary-disappearance recovery.
 
@@ -47,7 +47,7 @@ With Automatic lock on hit On, **After target death** defaults to **Nearest enem
 
 ## Configuration
 
-Open Mod Settings, select **Combat Camera - Configurable**, adjust the controls and press **Apply**. Settings stay active across save loads and are read again at the next launch.
+Open Mod Settings, select **Combat Camera - Configurable** and adjust the controls. Settings stay active across save loads and are read again at the next launch.
 
 | Setting | Default | Values |
 | --- | --- | --- |
@@ -73,11 +73,11 @@ When a tracked enemy disappears, Smooth tracking remembers that same living enem
 
 The saved camera keys are `cameraMode` (0 Free, 1 Smooth, 2 Native), `trackingSpeed`, `trackingResumeMs` and `trackingCatchup` (100 disables the boost; 200-500 sets its maximum percentage, default 300). Older `freeCamera` preferences remain readable but do not control camera behavior. Missing camera preferences start with Free, 50% and 750 ms while existing preferences are retained.
 
-The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferences receive the missing key with value 0. Changing this option with Apply preserves your lock state; turning it Off releases its targeting priority. Automatic lock on hit (`autoLockOnHit`, 0 Off / 1 On) also enables attacker priority and defaults to 1. Its death choice is `afterTargetDeath` (0 Nearest enemy / 1 Wait for next hit), defaulting to 0. Missing keys receive these defaults without replacing existing preferences, including an explicitly saved Off choice.
+The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferences receive the missing key with value 0. Changing this option preserves your lock state; turning it Off releases its targeting priority. Automatic lock on hit (`autoLockOnHit`, 0 Off / 1 On) also enables attacker priority and defaults to 1. Its death choice is `afterTargetDeath` (0 Nearest enemy / 1 Wait for next hit), defaulting to 0. Missing keys receive these defaults without replacing existing preferences, including an explicitly saved Off choice.
 
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
-Logging writes Apply events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses, tracked-target clears, recovery attempts and results, attacker hits/switches/rejections/manual overrides, automatic locks and target-death searches/switches/misses, camera-direction and fallback counts, and aggregate tracking/recovery/direction/attacker/death-selection time in microseconds. Leave it Off during normal play.
+Logging writes diagnostic events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses, tracked-target clears, recovery attempts and results, attacker hits/switches/rejections/manual overrides, automatic locks and target-death searches/switches/misses, camera-direction and fallback counts, and aggregate tracking/recovery/direction/attacker/death-selection time in microseconds. Leave it Off during normal play.
 
 ## Implementation
 
@@ -99,4 +99,4 @@ Unlocked attack direction uses camera yaw, so looking up or down keeps attacks h
 
 Inspired by [Free Combat Camera Ã¢â‚¬â€œ Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340) by xxxxxMIKxxxxx. This is an independent implementation: no code from the original mod was copied or reused. The original mod is not required, and its DLL, configuration and bootstrap are not included.
 
-Thanks to the UE4SS contributors, the Dawnwalker Framecore maintainers, the Mod Setting Menu author for the documented Apply client, and Tsuda Kageyu and contributors for MinHook. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Thanks to the UE4SS contributors, the Dawnwalker Framecore maintainers, the Mod Setting Menu author for the documented settings client, and Tsuda Kageyu and contributors for MinHook. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

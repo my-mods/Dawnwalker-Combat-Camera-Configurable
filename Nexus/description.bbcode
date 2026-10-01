@@ -33,21 +33,38 @@ Camera behavior is independent of target selection. Smooth and Native tracking r
 
 Open Mod Settings, select [b]Combat Camera - Configurable[/b] and adjust the controls.
 
+[b][color=#E8C88A]General[/color][/b]
 [list]
 [*][b][color=#A8D5C2]Enable mod:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.
+[/list]
+
+[b][color=#E8C88A]Camera[/color][/b]
+[list]
 [*][b][color=#A8D5C2]Camera behavior:[/color][/b] Free by default. Smooth tracking gently follows a locked enemy; Native tracking uses the game's normal tracking speed.
 [*][b][color=#A8D5C2]Tracking speed:[/color][/b] 50% by default, adjustable from 10% to 100% in 5% steps. Shown only for Smooth tracking. Controls automatic following independently of controller aim slowdown.
-[*][b][color=#A8D5C2]Tracking resume delay:[/color][/b] 750 ms (0.75 seconds) by default, adjustable from 0 to 3000 ms in 50 ms steps. Shown only for Smooth tracking. Manual camera movement pauses tracking, which then eases back in after this delay. With Camera-directed targeting On, keep this longer than Target switch delay and allow extra time for target selection so tracking does not pull you away before switching.
 [*][b][color=#A8D5C2]Tracking catch-up:[/color][/b] Up to 3x by default; choose Off or a maximum of 2x to 5x. Smooth tracking turns faster as the target moves farther from camera aim, increasing the boost from 45 to 180 degrees and easing back to normal near the target. Manual camera input still takes priority.
+[*][b][color=#A8D5C2]Tracking resume delay:[/color][/b] 750 ms (0.75 seconds) by default, adjustable from 0 to 3000 ms in 50 ms steps. Shown only for Smooth tracking. Manual camera movement pauses tracking, which then eases back in after this delay. With Camera-directed targeting On, keep this longer than Target switch delay and allow extra time for target selection so tracking does not pull you away before switching.
+[/list]
+
+[b][color=#E8C88A]Targeting[/color][/b]
+[list]
 [*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On selects enemies toward the camera while locked. Off retains your chosen enemy. Both choices work with all three camera behaviors.
-[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority after a hit; deliberate camera aiming can override it when Camera-directed targeting is On. Hits while unlocked only turn target lock on when Automatic lock on hit is enabled. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.
-[*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.
 [*][b][color=#A8D5C2]Targeting cone:[/color][/b] 45° from the camera axis by default; adjustable from 1° to 90°. Set 0 to use the native cone.
-[*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.
-[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] On by default.
-[*][b][color=#A8D5C2]Slowdown strength:[/color][/b] 35% by default; adjustable from 0% to 80%.
+[*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.
+[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority after a hit; deliberate camera aiming can override it when Camera-directed targeting is On. Hits while unlocked only turn target lock on when Automatic lock on hit is enabled. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.
 [*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire and switch to enemies whose attacks hit you, including blocks and parries. Works independently of Lock to last attacker.
 [*][b][color=#A8D5C2]After target death:[/color][/b] Nearest enemy by default, or Wait for next hit. Applies when Automatic lock on hit is On. If no eligible enemy is in native range, remain unlocked until another hit or manual lock.
+[/list]
+
+[b][color=#E8C88A]Controller[/color][/b]
+[list]
+[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] On by default.
+[*][b][color=#A8D5C2]Slowdown strength:[/color][/b] 35% by default; adjustable from 0% to 80%.
+[/list]
+
+[b][color=#E8C88A]Diagnostics[/color][/b]
+[list]
 [*][b][color=#A8D5C2]Logging:[/color][/b] Off by default. When enabled, writes diagnostic events and aggregate summaries to Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log.
 [/list]
 [size=4][b][color=#E8C88A]Targeting behavior[/color][/b][/size]

@@ -49,23 +49,23 @@ With Automatic lock on hit On, **After target death** defaults to **Nearest enem
 
 Open Mod Settings, select **Combat Camera - Configurable** and adjust the controls. Settings stay active across save loads and are read again at the next launch.
 
-| Setting | Default | Values |
-| --- | --- | --- |
-| Enable mod | On | Off / On |
-| Camera behavior | Free | Free / Smooth tracking / Native tracking |
-| Tracking speed | 50% | 10Ã¢â‚¬â€œ100%, in 5% steps; Smooth only |
-| Tracking resume delay | 750 ms | 0Ã¢â‚¬â€œ3000 ms, in 50 ms steps; Smooth only |
-| Camera-directed targeting | On | Off / On |
-| Lock to last attacker | Off | Off / On; requires active target lock |
-| Target switch delay | 65 ms | 0Ã¢â‚¬â€œ1000 ms |
-| Targeting cone | 45Ã‚Â° | 1Ã¢â‚¬â€œ90Ã‚Â°; 0 uses the native cone |
-| Center dot | Off | Off / Weapon drawn / Always in gameplay |
-| Controller aim slowdown | On | Off / On |
-| Slowdown strength | 35% | 0Ã¢â‚¬â€œ80% |
-| Automatic lock on hit | On | Off / On |
-| After target death | Nearest enemy | Nearest enemy / Wait for next hit; Automatic lock on hit only |
-| Tracking catch-up | Up to 3x | Off / Up to 2x / 3x / 4x / 5x; Smooth only |
-| Logging | Off | Off / On |
+| Category | Setting | Default | Values |
+| --- | --- | --- | --- |
+| General | Enable mod | On | Off / On |
+|  | Center dot | Off | Off / Weapon drawn / Always in gameplay |
+| Camera | Camera behavior | Free | Free / Smooth tracking / Native tracking |
+|  | Tracking speed | 50% | 10Ã¢â‚¬â€œ100%, in 5% steps; Smooth only |
+|  | Tracking catch-up | Up to 3x | Off / Up to 2x / 3x / 4x / 5x; Smooth only |
+|  | Tracking resume delay | 750 ms | 0Ã¢â‚¬â€œ3000 ms, in 50 ms steps; Smooth only |
+| Targeting | Camera-directed targeting | On | Off / On |
+|  | Targeting cone | 45Ã‚Â° | 1Ã¢â‚¬â€œ90Ã‚Â°; 0 uses the native cone |
+|  | Target switch delay | 65 ms | 0Ã¢â‚¬â€œ1000 ms |
+|  | Lock to last attacker | Off | Off / On; requires active target lock |
+|  | Automatic lock on hit | On | Off / On |
+|  | After target death | Nearest enemy | Nearest enemy / Wait for next hit; Automatic lock on hit only |
+| Controller | Controller aim slowdown | On | Off / On |
+|  | Slowdown strength | 35% | 0Ã¢â‚¬â€œ80% |
+| Diagnostics | Logging | Off | Off / On |
 
 Smooth tracking starts from the current view and eases toward the target without snapping. After manual camera movement, it waits for the resume delay (750 ms is 0.75 seconds) and eases back in over 200 ms. Tracking speed controls the mod's automatic turn strength, not a percentage of native tracking speed. With Tracking catch-up Off, the maximum combined turn rate is 90 degrees per second at 50% speed, or 180 degrees per second at 100% speed. Tracking catch-up defaults to Up to 3x: the boost increases smoothly between 45 and 180 degrees from the target, then fades back to normal as the camera catches up. At 50% speed and a full half-turn, the default maximum is 270 degrees per second. The camera always takes the shortest turn and keeps the smooth engagement ramp. Set catch-up to Off to retain the base turn rate. With Camera-directed targeting On, keep Tracking resume delay longer than Target switch delay and allow extra time for target selection: searches run at 50 ms intervals and a fallback can need another interval. Otherwise tracking can pull the camera away before your new target is selected.
 

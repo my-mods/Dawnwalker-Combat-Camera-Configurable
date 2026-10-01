@@ -1,1 +1,1 @@
-Improved recovery of disappearing targets, adjustable smooth tracking catch-up, and reorganized settings.
+Recover tracked enemies, even behind the camera. Add an optional speed boost to camera tracking for large turns.

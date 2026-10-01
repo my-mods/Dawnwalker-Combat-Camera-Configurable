@@ -2,9 +2,8 @@
 
 ## Unreleased
 
-- Add Riposte direction: Vanilla (Random), Opposite direction (default), or Same direction for the red opening after a successful directional parry.
-- Reduce riposte tracking overhead during object deletion, repeated opening queries and incoming hits.
-- Keep Same and Opposite riposte direction tied to the parried attack when the guard has already cleared or changed.
+- Move riposte direction control into Easier Parry and Dodge While Blocking.
+
 - Group related settings together and remove repeated Camera and Targeting headings.
 - Recover the same tracked enemy after temporary target clears or delayed reappearance, including behind the camera.
 - Add configurable smooth tracking catch-up, with an Off option and up to 2x-5x speed for large turns.

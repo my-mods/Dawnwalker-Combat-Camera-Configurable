@@ -4,13 +4,14 @@
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
 // Optional riposte selector and stale-parry invalidation. Core ReactToHit
-// already validates the response action and attacking-component fields.
-inline constexpr std::array<NativeCompatibility::Code,5> riposteCode{{
+// already validates the response action, incoming direction and attacker fields.
+inline constexpr std::array<NativeCompatibility::Code,6> riposteCode{{
 {0x5dd5890,87,"2ff82a31983d7af5033b74a28a96bbc377b9d89241a96b5b327178e3e8c1c301"},
 {0x5e1c058,190,"2e63adda340c572121eb27f7ca4fc2b3c2000372d66764fd89de54d3b144384b"},
 {0x5e18ba8,299,"e1cd5a3138f36c89e73f36091bb8f15a3856d9df82485947f0f9ee15981c0722"},
 {0x5dd74de,17,"88df69ac95184dc2c614b9f83be91f4b79f581414156f0bbfa4c8bd68dc6f67c"},
 {0x28879ac,43,"0a26234bc9f2f603f2dcd517fd2b50db5fca9d04c275a848dac97d63590d21ba"},
+{0x5e12ca4,85,"cb75a89693f977b53aadab41626fd8f843d0f8b681556376ca2ac0d344381794"},
 }};
 // Optional ability validation and native planning/getter consumers.
 inline constexpr std::array<NativeCompatibility::Code,7> focusCode{{

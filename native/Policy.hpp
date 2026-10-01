@@ -18,6 +18,11 @@ struct Settings {
     int trackingCatchup{300}; // Maximum angular-error boost; 100 disables it.
     int riposteDirection{1}; // 0: vanilla, 1: opposite block, 2: same block.
 };
+// Match the native attack-to-block conversion for cardinal hit directions.
+// Non-directional attacks retain vanilla selection; never call its RNG fallback.
+inline uint8_t parriedBlock(uint8_t attack) {
+    return attack==1?8:attack==2?4:attack==3?1:attack==4?2:0;
+}
 // Indices follow the player's visible directions: top, bottom, left, right.
 inline int riposteSide(uint8_t block,int mode) {
     int side=block==1?0:block==2?1:block==4?2:block==8?3:-1;

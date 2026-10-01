@@ -337,7 +337,7 @@ struct Metrics {
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
     uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{};
     uint64_t focusQueries{},focusTargets{},focusMicros{};
-    uint64_t riposteParries{},riposteQueries{},riposteApplied{},riposteMisses{},riposteMicros{};
+    uint64_t riposteParries{},riposteQueries{},riposteApplied{},riposteMisses{},riposteMicros{},riposteGuardDrift{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -359,6 +359,7 @@ void report(uint64_t now) {
         L" riposteMode="+std::to_wstring(settings.riposteDirection)+L" riposteParries="+std::to_wstring(metrics.riposteParries)+
         L" riposteQueries="+std::to_wstring(metrics.riposteQueries)+L" riposteApplied="+std::to_wstring(metrics.riposteApplied)+
         L" riposteMisses="+std::to_wstring(metrics.riposteMisses)+L" riposteUs="+std::to_wstring(metrics.riposteMicros)+
+        L" riposteGuardDrift="+std::to_wstring(metrics.riposteGuardDrift)+
         L" directionUs="+std::to_wstring(metrics.directionMicros)+
         L" cameraMode="+std::to_wstring(settings.cameraMode)+L" trackingSteps="+std::to_wstring(metrics.trackingSteps)+
         L" viewChecks="+std::to_wstring(cameraMetrics.viewChecks.exchange(0))+L" viewOtherThread="+std::to_wstring(cameraMetrics.viewOtherThread.exchange(0))+
@@ -531,7 +532,9 @@ void rememberRiposte(void* combat,void* attack,void* response) {
         const auto i=std::countr_zero(pending);
         if(ripostes[i].combat.address==reinterpret_cast<uintptr_t>(target))clearRiposte(i);
     }
-    const auto block=field<uint8_t>(combat,0x960);
+    // Native parries can use the previous guard after the current guard clears
+    // or moves. The incoming hit keeps the direction that was actually parried.
+    const auto block=parriedBlock(field<uint8_t>(attack,0x18));
     auto parry=field<void*>(combat,0x268);
     if(!target||target==combat||!response||!parry||field<void*>(response,0)!=parry||riposteSide(block,settings.riposteDirection)<0)return;
     const auto targetId=identity(target);if(!targetId.address)return;
@@ -546,7 +549,10 @@ void rememberRiposte(void* combat,void* attack,void* response) {
     session.watched[15+slot*2].store(stubId.index,std::memory_order_relaxed);
     riposteMask|=1u<<slot;
     session.riposteWatches.store(riposteMask,std::memory_order_release);
-    if(settings.debugLogging)++metrics.riposteParries;
+    if(settings.debugLogging){
+        ++metrics.riposteParries;
+        if(field<uint8_t>(combat,0x960)!=block)++metrics.riposteGuardDrift;
+    }
 }
 bool riposteGraph(void* frame) {
     auto node=field<void*>(frame,0x10),task=field<void*>(frame,0x18);

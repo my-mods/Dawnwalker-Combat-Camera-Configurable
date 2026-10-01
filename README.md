@@ -13,6 +13,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 - Optionally **Lock to last attacker** after a hit, block or parry while already locked on. This is Off by default and works with every camera behavior.
 - **Automatic lock on hit**, On by default, acquires an attacker even while unlocked. **After target death** selects the nearest eligible enemy by default, or waits for the next hit. Smooth tracking keeps your chosen speed and manual-input behavior.
 - Show a small center dot when a weapon is drawn, throughout gameplay, or never. The dot is drawn through the game's HUD.
+- Choose **Riposte direction**: **Vanilla (Random)**, **Opposite direction** (default), or **Same direction**. The red critical-riposte opening follows the selected rule after a successful directional parry.
 - Add optional controller aim slowdown during camera-directed targeting. Fixed-target and untargeted modes keep full camera sensitivity. Mouse movement is excluded.
 - Choose camera behavior, tracking strength, resume delay, target selection, center dot and slowdown in Mod Setting Menu. Preferences are saved for subsequent launches.
 
@@ -53,6 +54,7 @@ Open Mod Settings, select **Combat Camera - Configurable** and adjust the contro
 | --- | --- | --- | --- |
 | General | Enable mod | On | Off / On |
 |  | Center dot | Off | Off / Weapon drawn / Always in gameplay |
+|  | Riposte direction | Opposite direction | Vanilla (Random) / Opposite direction / Same direction |
 | Camera | Camera behavior | Free | Free / Smooth tracking / Native tracking |
 |  | Tracking speed | 50% | 10Ã¢â‚¬â€œ100%, in 5% steps; Smooth only |
 |  | Tracking catch-up | Up to 3x | Off / Up to 2x / 3x / 4x / 5x; Smooth only |
@@ -75,6 +77,8 @@ The saved camera keys are `cameraMode` (0 Free, 1 Smooth, 2 Native), `trackingSp
 
 The saved attacker option is `lockLastAttacker` (0 Off, 1 On). Existing preferences receive the missing key with value 0. Changing this option preserves your lock state; turning it Off releases its targeting priority. Automatic lock on hit (`autoLockOnHit`, 0 Off / 1 On) also enables attacker priority and defaults to 1. Its death choice is `afterTargetDeath` (0 Nearest enemy / 1 Wait for next hit), defaulting to 0. Missing keys receive these defaults without replacing existing preferences, including an explicitly saved Off choice.
 
+**Riposte direction** uses the on-screen block side at the moment of a successful directional parry. Opposite pairs Left with Right and Top with Bottom; Same keeps that side. Vanilla preserves the game's random opening selection. The Critical Riposte skill requirements, chance to create an opening, duration and damage remain governed by the game. The setting works with every camera behavior and either lock state; it does not choose your attack input. Its saved key is `riposteDirection`: 0 Vanilla, 1 Opposite (default), 2 Same.
+
 The mod creates `settings.ini` inside its `CombatCamera` folder on first launch. The archive does not include a replacement preferences file. Manual edits to that generated file take effect after restarting the game; edit existing keys under `[Settings]` and keep a backup. The settings-menu definition is `mod_settings.ini` and should not be used for personal preferences.
 
 Logging writes diagnostic events and one aggregate diagnostic summary per ten seconds of active gameplay to `Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log`. This includes camera mode, tracking updates, manual-input pauses, temporary target losses, tracked-target clears, recovery attempts and results, attacker hits/switches/rejections/manual overrides, automatic locks and target-death searches/switches/misses, camera-direction and fallback counts, and aggregate tracking/recovery/direction/attacker/death-selection time in microseconds. Leave it Off during normal play.
@@ -86,6 +90,8 @@ Camera-directed requests run only while target lock and Camera-directed targetin
 Last-attacker requests use the same interval and check only that attacker within the native candidate list. Rapid hits coalesce into the newest request. A pending hit can wait up to one second of gameplay time for an eligible player state; an attempted but rejected selection is not retried. Holding the attacker suspends camera-directed searches until manual camera movement requests an override. A different candidate must remain preferred for Target switch delay; a valid attacker can stay selected outside the camera cone during that wait. Looking back at the attacker or finding no alternative ends the override attempt. A new hit restarts attacker priority. Fixed-target mode holds the selected attacker until another hit or target loss. The selected camera behavior and optional controller slowdown remain active. The option adds no settings polling or object searches while idle.
 
 Automatic hit acquisition uses the same coalesced request and 50 ms budget. A death handoff queues one nearest-enemy pass and, if needed, one fallback pass on the next budget interval. It waits up to three seconds of ordinary gameplay readiness; synchronized actions defer service until they finish. Failure leaves targeting unlocked, with no continuing nearest-enemy searches. No new timer, global object search or settings polling is added.
+
+Riposte direction uses a recent, one-use parry record for the enemy receiving the opening. The record expires after one second of gameplay time and is discarded on an accepted queued attack, a dodge event, settings changes, player-context changes or enemy deletion. A newer reaction from the same enemy replaces it. Other opening sources and unmatched events retain native selection. The optional riposte integration checks its native functions and the opening task's direction branches; an unsupported dependency falls back to vanilla openings while camera features remain available. Logging includes parry, opening-query, override and unmatched-query counts with aggregate selection time.
 
 See [BUILD.md](BUILD.md) for the source build and supported binary fingerprints.
 

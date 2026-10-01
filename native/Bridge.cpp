@@ -18,6 +18,7 @@
 #include "Bridge.hpp"
 #include "GameBuild.hpp"
 #include "GameCode.hpp"
+#include "RiposteScript.hpp"
 
 extern "C" {
     void CameraGate(); void ConeGate(); void ForwardGate();
@@ -54,8 +55,9 @@ Settings settings;
 DWORD gameThread{};
 bool attempted{};
 bool inputSupported{true};
+bool riposteSupported{};
 std::wstring startError;
-std::array<void*,32> hooked{};size_t hookCount{};
+std::array<void*,35> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -71,7 +73,7 @@ Identity identity(void* object) {
     return {reinterpret_cast<uintptr_t>(object),index,item->GetSerialNumber()};
 }
 struct Session final:FUObjectDeleteListener {
-    std::array<std::atomic_int,14> watched;
+    std::array<std::atomic_int,30> watched;
     std::atomic_uint32_t invalidated{};
     Session(){for(auto& x:watched)x.store(-1);}
     void NotifyUObjectDeleted(const UObjectBase*,int32_t index) override {
@@ -84,12 +86,37 @@ struct Session final:FUObjectDeleteListener {
 } session;
 bool listening{};
 void Session::OnUObjectArrayShutdown() {
-    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(16383);
+    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(0x3fffffff);
     // Unregister before the engine checks its shutdown listener registry.
     // Leave hook teardown to stop(); no dying game objects are accessed here.
     if(listening){FUObjectArray::RemoveUObjectDeleteListener(this);listening=false;}
 }
 Identity ownerId,castLockId,assistTargetId,pendingId;
+// One-use parry snapshots, bounded by gameplay time. Only identity values and
+// direction survive ReactToHit; no attack/response/task pointers are retained.
+struct Riposte {Identity combat,stub;double remaining{};uint8_t block{};uint64_t sequence{};};
+std::array<Riposte,8> ripostes{};
+uint64_t riposteSequence{};
+bool hasRipostes{};
+void clearRiposte(size_t i) {
+    ripostes[i]={};session.watched[14+i*2]=-1;session.watched[15+i*2]=-1;
+}
+void clearRipostes() {
+    if(!hasRipostes)return;
+    for(size_t i=0;i<ripostes.size();++i)clearRiposte(i);
+    hasRipostes=false;
+}
+void expireRipostes(void* combat,float delta) {
+    if(!hasRipostes)return;
+    if(!std::isfinite(delta)||delta<0||!(field<uint8_t>(combat,0x8e)&0x10)||field<uint8_t>(combat,0xb28)==11){clearRipostes();return;}
+    hasRipostes=false;
+    for(size_t i=0;i<ripostes.size();++i){
+        auto& entry=ripostes[i];
+        if(!entry.remaining)continue;
+        if(delta>=entry.remaining)clearRiposte(i);
+        else{entry.remaining-=delta;hasRipostes=true;}
+    }
+}
 // Shared only by on-demand enemy checks, with indexed lifetime validation.
 Identity abilityTargetId,abilityActorId;
 uint64_t abilityQueryAt{};bool abilityQueried{};
@@ -174,6 +201,7 @@ void* resolveAttacker(const Identity& id) {
 }
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
+    clearRipostes();
     ++lockIntent;clearDeath();
     attackerSelectionInvalidated=true;
     abilityTargetId={};abilityActorId={};abilityQueried=false;
@@ -194,6 +222,7 @@ void syncSession() {
     if(mask&768)clearAttackerPending();
     if(mask&3072)clearAttackerHeld();
     if(mask&12288)attackerSelectionInvalidated=true;
+    if(mask&0x3fffc000)for(size_t i=0;i<ripostes.size();++i)if(mask&(3u<<(14+i*2)))clearRiposte(i);
 }
 bool live(){return active.load(std::memory_order_relaxed)&&GetCurrentThreadId()==gameThread;}
 bool sameCurrent(void* object,const Identity& id){return id.address && identity(object)==id;}
@@ -218,7 +247,7 @@ bool managed(void* combat,bool cameraContext=false) {
     auto pawn=field<void*>(combat,0xa8);
     if(!gameplay(pawn,true)||field<void*>(pawn,0xc90)!=combat){
         auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
-        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();clearDeath();}
+        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();clearDeath();clearRipostes();}
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
@@ -236,7 +265,8 @@ bool managed(void* combat,bool cameraContext=false) {
             if(settings.debugLogging)cameraMetrics.initialDetaches.fetch_add(1,std::memory_order_relaxed);
         }
     }
-    return cameraContext||field<uint8_t>(combat,0xb28)!=11;
+    if(!cameraContext&&field<uint8_t>(combat,0xb28)==11){clearRipostes();return false;}
+    return true;
 }
 bool eligible(void* combat,bool acquiring=false) {
     if(!managed(combat)||(!playerLocked&&!acquiring)||!(field<uint8_t>(combat,0x8e)&0x10)||
@@ -253,6 +283,9 @@ using Lock=void(*)(void*,bool);Lock originalLock{};
 using LoseLock=void(*)(void*,void*,float);LoseLock originalLoseLock{};
 using ReactToHit=void(*)(void*,void*,void*,void*);ReactToHit originalReactToHit{};
 using Script=void(*)(void*,void*,void*);Script originalLockScript{},originalSwitchScript{};
+Script originalRiposteQuery{};
+using QueueAttack=bool(*)(void*,void*);QueueAttack originalQueueAttack{};
+using OnDodge=void(*)(void*,void*);OnDodge originalOnDodge{};
 using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
 SetTarget originalAttackTarget{};
 using CanAbility=bool(*)(void*,void*,void*,uint8_t*,bool*);CanAbility originalCanAbility{};
@@ -294,6 +327,7 @@ struct Metrics {
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
     uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{};
     uint64_t focusQueries{},focusTargets{},focusMicros{};
+    uint64_t riposteParries{},riposteQueries{},riposteApplied{},riposteMisses{},riposteMicros{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -312,6 +346,9 @@ void report(uint64_t now) {
         L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
         L" focusQueries="+std::to_wstring(metrics.focusQueries)+L" focusTargets="+std::to_wstring(metrics.focusTargets)+
         L" focusUs="+std::to_wstring(metrics.focusMicros)+
+        L" riposteMode="+std::to_wstring(settings.riposteDirection)+L" riposteParries="+std::to_wstring(metrics.riposteParries)+
+        L" riposteQueries="+std::to_wstring(metrics.riposteQueries)+L" riposteApplied="+std::to_wstring(metrics.riposteApplied)+
+        L" riposteMisses="+std::to_wstring(metrics.riposteMisses)+L" riposteUs="+std::to_wstring(metrics.riposteMicros)+
         L" directionUs="+std::to_wstring(metrics.directionMicros)+
         L" cameraMode="+std::to_wstring(settings.cameraMode)+L" trackingSteps="+std::to_wstring(metrics.trackingSteps)+
         L" viewChecks="+std::to_wstring(cameraMetrics.viewChecks.exchange(0))+L" viewOtherThread="+std::to_wstring(cameraMetrics.viewOtherThread.exchange(0))+
@@ -471,7 +508,97 @@ void clearTarget(void* combat,bool preserveAutomatic=false) {
     if((field<uint8_t>(combat,0x14a9)!=0)!=playerLocked)originalLock(combat,playerLocked);
     assistScale=1;assistAt=0;dwell.clear();nextFallback=false;
 }
+void riposteUnavailable(const std::wstring& reason) {
+    riposteSupported=false;clearRipostes();
+    RC::Output::send(L"[CombatCamera] Riposte direction unavailable: "+reason+L". Using vanilla openings; camera features remain available.\n");
+}
+void rememberRiposte(void* combat,void* attack,void* response) {
+    if(!riposteSupported||!settings.riposteDirection||!attack||!managed(combat)||!(field<uint8_t>(combat,0x8e)&0x10))return;
+    auto target=field<void*>(attack,0x28);
+    // Another reaction from this enemy replaces its old pending parry, even
+    // when this hit was an ordinary block, omniblock or an unguarded hit.
+    for(size_t i=0;i<ripostes.size();++i)if(ripostes[i].combat.address==reinterpret_cast<uintptr_t>(target))clearRiposte(i);
+    const auto block=field<uint8_t>(combat,0x960);
+    auto parry=field<void*>(combat,0x268);
+    if(!target||target==combat||!response||!parry||field<void*>(response,0)!=parry||riposteSide(block,settings.riposteDirection)<0)return;
+    const auto targetId=identity(target);if(!targetId.address)return;
+    const auto stubId=identity(field<void*>(target,0x1070));if(!stubId.address)return;
+    size_t slot=0;
+    for(size_t i=0;i<ripostes.size();++i){
+        if(!ripostes[i].remaining){slot=i;break;}
+        if(ripostes[i].sequence<ripostes[slot].sequence)slot=i;
+    }
+    ripostes[slot]={targetId,stubId,1.0,block,++riposteSequence};hasRipostes=true;
+    session.watched[14+slot*2]=targetId.index;session.watched[15+slot*2]=stubId.index;
+    if(settings.debugLogging)++metrics.riposteParries;
+}
+bool riposteGraph(void* frame) {
+    auto node=field<void*>(frame,0x10),task=field<void*>(frame,0x18);
+    if(!node||!task||field<uint64_t>(node,0x18)!=Build::riposteGraphName)return false;
+    auto cls=field<void*>(node,0x20);
+    if(!cls||field<uint64_t>(cls,0x18)!=Build::riposteClassName||field<void*>(task,0x10)!=cls)return false;
+    auto package=field<void*>(cls,0x20),parent=field<void*>(cls,0x40);
+    if(!package||field<uint64_t>(package,0x18)!=Build::ripostePackageName)return false;
+    auto script=field<uintptr_t>(node,0x60);
+    // The original exec has consumed EX_EndFunctionParms before we inspect.
+    if(!parent||field<uint64_t>(parent,0x18)!=Build::riposteBaseName||!script||field<int>(node,0x68)!=RiposteScript::size||
+       field<uintptr_t>(frame,0x20)!=script+RiposteScript::queryEnd+1){
+        riposteUnavailable(L"weak-spot task layout or query call site differs");return false;
+    }
+    for(const auto& part:RiposteScript::bytes)if(std::memcmp(reinterpret_cast<void*>(script+part.offset),part.value,part.length)!=0){
+        riposteUnavailable(L"weak-spot direction branch differs at bytecode "+std::to_wstring(part.offset));return false;
+    }
+    for(size_t i=0;i<RiposteScript::objects.size();++i){
+        auto object=field<void*>(reinterpret_cast<void*>(script),RiposteScript::objects[i].offset);
+        if(!object||field<uint64_t>(object,0x18)!=RiposteScript::names[i]){
+            riposteUnavailable(L"weak-spot direction function or effect reference differs");return false;
+        }
+    }
+    for(const auto& property:RiposteScript::properties){
+        const auto value=field<uintptr_t>(reinterpret_cast<void*>(script),property.offset);
+        if(!value||value!=field<uintptr_t>(reinterpret_cast<void*>(script),property.reference)){
+            riposteUnavailable(L"weak-spot direction variable binding differs");return false;
+        }
+    }
+    return true;
+}
+void riposteQuery(void* combat,void* frame,void* result) {
+    originalRiposteQuery(combat,frame,result);
+    if(!live()||!riposteSupported||!settings.riposteDirection||!hasRipostes||!frame||!result||!managed(combat))return;
+    if(!riposteGraph(frame))return;
+    const auto before=settings.debugLogging?clockMicros():0;
+    if(settings.debugLogging)++metrics.riposteQueries;
+    auto task=field<void*>(frame,0x18),stub=field<void*>(task,0x28);
+    bool applied=false;
+    for(size_t i=0;i<ripostes.size();++i){
+        const auto entry=ripostes[i];
+        if(!entry.remaining||entry.stub.address!=reinterpret_cast<uintptr_t>(stub))continue;
+        auto enemy=resolveAttacker(entry.combat);
+        const bool valid=enemy&&resolveAttacker(entry.stub)==stub&&field<void*>(enemy,0x1070)==stub&&field<uint8_t>(enemy,0xb28)!=10;
+        clearRiposte(i); // Consume before publishing; repeated queries stay native.
+        const auto side=riposteSide(entry.block,settings.riposteDirection);
+        if(valid&&side>=0){*static_cast<uint64_t*>(result)=Build::riposteTags[side];applied=true;}
+        break;
+    }
+    if(settings.debugLogging){
+        if(applied)++metrics.riposteApplied;else ++metrics.riposteMisses;
+        metrics.riposteMicros+=clockMicros()-before;
+    }
+}
+bool queueAttack(void* combat,void* tags) {
+    const auto sequence=riposteSequence;
+    const auto result=originalQueueAttack(combat,tags);
+    if(result&&live()&&hasRipostes&&ownerId.address==reinterpret_cast<uintptr_t>(combat)&&sequence==riposteSequence)clearRipostes();
+    return result;
+}
+void onDodge(void* combat,void* direction) {
+    if(live()&&hasRipostes&&ownerId.address==reinterpret_cast<uintptr_t>(combat))clearRipostes();
+    originalOnDodge(combat,direction);
+}
 void reactToHit(void* combat,void* animation,void* attack,void* response) {
+    // Arm before the original: the native reaction can create the opening
+    // synchronously. Only the native parry action is accepted.
+    if(live())rememberRiposte(combat,attack,response);
     // PlayerCombatComponent::ReactToHit: R8 is InAttackData, whose +0x28
     // owns the attacker's combat component. Native reactions include block,
     // parry and omniblock. No health-loss threshold or borrowed struct survives.
@@ -621,6 +748,7 @@ bool applyRecovery(void* combat) {
 void tick(void* pawn,float delta) {
     auto combat=live()&&pawn?field<void*>(pawn,0xc90):nullptr;
     if(managed(combat)){
+        expireRipostes(combat,delta);
         if(recoveryRemaining){
             // Native recovery timers use gameplay time, including time dilation.
             // Only an outstanding loss adds this scalar watchdog work.
@@ -1080,6 +1208,7 @@ extern "C" bool UseNearestScore(void* context) {
 void configure(Settings value) {
     if(gameThread&&GetCurrentThreadId()!=gameThread)throw std::runtime_error("Settings must be applied on the game thread");
     const bool cameraChanged=settings.cameraMode!=value.cameraMode;
+    clearRipostes();
     if(attackerHeldTargetId.address)clearAttackerLook();
     ++lockIntent;clearDeath();
     if(settings.lockLastAttacker!=value.lockLastAttacker||settings.autoLockOnHit!=value.autoLockOnHit)clearAttacker();
@@ -1115,13 +1244,54 @@ bool start(std::wstring& error) {
             RC::Output::send(L"[CombatCamera] Unlocked ability targeting unavailable: "+std::wstring(reason.begin(),reason.end())+L". Camera features remain available.\n");
         }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
-        // Engine's FName constructor, resolved from the exact build. Stores
-        // value IDs only and is called four times on the game thread at startup.
+        // Engine's validated FName constructor. Store only value IDs; resolve
+        // input and optional riposte names once on the game thread at startup.
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::lookName,"IA_Look",1);
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::lookPackageName,"/Game/_Dawnwalker/Player/Input/Actions/Traversal/IA_Look",1);
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::playerGraphName,"ExecuteUbergraph_BP_PlayerCharacter",1);
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::playerClassName,"BP_PlayerCharacter_C",1);
         if(!Build::lookName||!Build::lookPackageName||!Build::playerGraphName||!Build::playerClassName)throw std::runtime_error("Player input action names are unavailable");
+        try {
+            NativeCompatibility::validateContract(moduleBase,Build::riposteCode,std::array<NativeCompatibility::Pointer,0>{});
+            const auto prop=Build::TaskOwnerProperty;
+            if(!NativeCompatibility::accessible(moduleBase,prop,64)||
+               field<uint32_t>(at<void*>(prop),0x32)!=0x28||
+               !NativeCompatibility::accessible(moduleBase,0x8d43a10,12)||
+               field<uintptr_t>(at<void*>(prop),0)!=moduleBase+0x8d43a10||
+               std::memcmp(at<void*>(0x8d43a10),"OwnerAIStub",12)!=0)
+               throw std::runtime_error("Weak-spot task OwnerAIStub property layout differs");
+            if(!NativeCompatibility::accessible(moduleBase,0x8e15780,64)||
+               field<uint32_t>(at<void*>(0x8e15780),0x32)!=0x1070||
+               !NativeCompatibility::accessible(moduleBase,0x8d3ebbc,7)||
+               field<uintptr_t>(at<void*>(0x8e15780),0)!=moduleBase+0x8d3ebbc||
+               std::memcmp(at<void*>(0x8d3ebbc),"AIStub",7)!=0)
+                throw std::runtime_error("Enemy combat AIStub property layout differs");
+            const uintptr_t blockNames[]{0x92f5b70,0x92f5b88,0x92f5b30,0x92f5b50};
+            const char* blockText[]{"EBlockingDirection::Top","EBlockingDirection::Bottom","EBlockingDirection::Left","EBlockingDirection::Right"};
+            if(!NativeCompatibility::accessible(moduleBase,0x92f8600,64))throw std::runtime_error("Blocking direction enum is unavailable");
+            for(size_t i=0;i<4;++i){
+                const auto length=std::strlen(blockText[i])+1;
+                auto entry=at<void*>(0x92f8600+i*16);
+                if(!NativeCompatibility::accessible(moduleBase,blockNames[i],length)||
+                   field<uintptr_t>(entry,0)!=moduleBase+blockNames[i]||field<uint64_t>(entry,8)!=(1ull<<i)||
+                   std::memcmp(at<void*>(blockNames[i]),blockText[i],length)!=0)
+                    throw std::runtime_error("Blocking direction enum value differs");
+            }
+            auto name=[](uint64_t& value,const char* text){
+                at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&value,text,1);
+                if(!value)throw std::runtime_error("Required weak-spot name is unavailable");
+            };
+            name(Build::riposteGraphName,"ExecuteUbergraph_LTT_AddWeakSpot");
+            name(Build::riposteClassName,"LTT_AddWeakSpot_C");
+            name(Build::ripostePackageName,"/Game/_Dawnwalker/AI/LogicTree/Tasks/LTT_AddWeakSpot");
+            name(Build::riposteBaseName,"RebelAILogicNode_Task_BlueprintBase");
+            const char* tags[]{"RebelAI.Direction.Top","RebelAI.Direction.Bottom","RebelAI.Direction.Left","RebelAI.Direction.Right"};
+            for(size_t i=0;i<4;++i)name(Build::riposteTags[i],tags[i]);
+            for(size_t i=0;i<RiposteScript::objects.size();++i)name(RiposteScript::names[i],RiposteScript::objects[i].name);
+            riposteSupported=true;
+        }catch(const std::exception& failure){
+            const std::string reason=failure.what();riposteUnavailable(std::wstring(reason.begin(),reason.end()));
+        }
         CameraContinue=at<void*>(Build::CameraResume);ConeContinue=at<void*>(Build::ConeResume);
         hook(Build::Camera,reinterpret_cast<void*>(&CameraGate),CameraOriginal);
         hook(Build::Score,reinterpret_cast<void*>(&ScoreGate),ScoreOriginal);
@@ -1131,6 +1301,19 @@ bool start(std::wstring& error) {
         hook(Build::Request,&nativeRequest,originalRequest);hook(Build::Lock,&lockTarget,originalLock);
         hook(Build::LoseLock,&loseLock,originalLoseLock);
         hook(Build::ReactToHit,&reactToHit,originalReactToHit);
+        if(riposteSupported){
+            const auto first=hookCount;
+            try{
+                hook(Build::RiposteQuery,&riposteQuery,originalRiposteQuery);
+                hook(Build::QueueAttack,&queueAttack,originalQueueAttack);
+                hook(Build::OnDodge,&onDodge,originalOnDodge);
+            }catch(const std::exception& failure){
+                // No queued hooks have been activated yet. Roll back only this
+                // optional feature, preserving every core camera hook.
+                while(hookCount>first)MH_RemoveHook(hooked[--hookCount]);
+                const std::string reason=failure.what();riposteUnavailable(std::wstring(reason.begin(),reason.end()));
+            }
+        }
         if(focusSupported){
             hook(Build::CanAbility,&canAbility,originalCanAbility);
             hook(Build::PlanAbility,&planAbility,originalPlanAbility);

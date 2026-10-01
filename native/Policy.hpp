@@ -16,7 +16,13 @@ struct Settings {
     bool autoLockOnHit{true};
     int afterTargetDeath{0}; // 0: nearest eligible enemy, 1: wait for another hit.
     int trackingCatchup{300}; // Maximum angular-error boost; 100 disables it.
+    int riposteDirection{1}; // 0: vanilla, 1: opposite block, 2: same block.
 };
+// Indices follow the player's visible directions: top, bottom, left, right.
+inline int riposteSide(uint8_t block,int mode) {
+    int side=block==1?0:block==2?1:block==4?2:block==8?3:-1;
+    return side<0||mode<1||mode>2?-1:mode==1?(side^1):side;
+}
 struct Vec3 { double x{}, y{}, z{}; };
 inline double dot(Vec3 a,Vec3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
 inline bool finite(Vec3 v) { return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z); }

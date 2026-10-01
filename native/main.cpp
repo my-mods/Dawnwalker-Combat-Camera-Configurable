@@ -23,6 +23,7 @@ public:
             s.lockLastAttacker=number(0,1)!=0;
             s.autoLockOnHit=number(0,1)!=0;s.afterTargetDeath=number(0,1);
             s.trackingCatchup=number(100,500);
+            s.riposteDirection=number(0,2);
             CombatCamera::configure(s);return 0;
         });
         lua.register_function("_CCStart",[](const Lua& l){

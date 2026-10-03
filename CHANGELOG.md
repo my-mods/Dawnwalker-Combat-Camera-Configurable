@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Prevent enemy-targeted instant casts from falling back to the player when no valid enemy is available.
+
 ## 3.4.0
 
 - Recover tracked enemies, even behind the camera.

@@ -259,6 +259,7 @@ using ActionTarget=bool(*)(void*);ActionTarget originalActionTarget{};
 SetTarget originalAttackTarget{};
 using CanAbility=bool(*)(void*,void*,void*,uint8_t*,bool*);CanAbility originalCanAbility{};
 using PlanAbility=bool(*)(void*,void*);PlanAbility originalPlanAbility{};
+using InstantAbility=void(*)(void*,void*);InstantAbility originalInstantAbility{};
 using FocusActor=void*(*)(void*);FocusActor originalFocusActor{};
 using Draw=void(*)(void*);Draw originalDraw{};
 struct InputValue{Vec3 value;int type;int padding;};static_assert(sizeof(InputValue)==32);
@@ -284,7 +285,7 @@ thread_local Identity nearestTargetId,nearestActorId;
 // Capture-only selection, requested only after an ability needs an enemy.
 struct FocusQuery {void* combat;Identity target;};
 thread_local FocusQuery* focusQuery{};
-struct AbilityPlan {void* focus;Identity actor;};
+struct AbilityPlan {void* focus;Identity actor;void* ability;Identity owner;uint64_t intent;};
 thread_local AbilityPlan* abilityPlan{};
 thread_local bool checkingAbility{};
 struct Metrics {
@@ -295,7 +296,7 @@ struct Metrics {
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{},trackedClears{},recoveryAttempts{},recoveryMicros{};
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
     uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{};
-    uint64_t focusQueries{},focusTargets{},focusMicros{};
+    uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -314,6 +315,7 @@ void report(uint64_t now) {
         L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
         L" focusQueries="+std::to_wstring(metrics.focusQueries)+L" focusTargets="+std::to_wstring(metrics.focusTargets)+
         L" focusUs="+std::to_wstring(metrics.focusMicros)+
+        L" abilityRejected="+std::to_wstring(metrics.abilityRejected)+
         L" directionUs="+std::to_wstring(metrics.directionMicros)+
         L" cameraMode="+std::to_wstring(settings.cameraMode)+L" trackingSteps="+std::to_wstring(metrics.trackingSteps)+
         L" viewChecks="+std::to_wstring(cameraMetrics.viewChecks.exchange(0))+L" viewOtherThread="+std::to_wstring(cameraMetrics.viewOtherThread.exchange(0))+
@@ -835,11 +837,15 @@ void setTarget(void* combat,void* target) {
     originalSetTarget(combat,target);
     if(local){if(!target)clearTracking();managed(combat,true);}
 }
-void* abilityCombat(void* pawn) {
+void* abilityPlayer(void* pawn) {
     if(!live()||!pawn)return nullptr;
     syncSession();
     auto combat=resolve(ownerId);
-    return combat&&field<void*>(combat,0xa8)==pawn&&managed(combat)&&!playerLocked&&
+    return combat&&field<void*>(combat,0xa8)==pawn&&managed(combat)?combat:nullptr;
+}
+void* abilityCombat(void* pawn) {
+    auto combat=abilityPlayer(pawn);
+    return combat&&!playerLocked&&
         (field<uint8_t>(combat,0x8e)&0x10)&&!field<uint8_t>(combat,0x1612)?combat:nullptr;
 }
 void* abilityEnemy(void* combat,bool fresh) {
@@ -887,7 +893,7 @@ bool routeAbility(void* ability,void* pawn,void* combat,uint8_t* reason,bool* de
     if(type!=0&&type!=2&&type!=3)return false;
     // Unlocked casts follow camera aim, never a leftover focus actor.
     target=abilityEnemy(combat,fresh);
-    if(!target)return false;
+    if(!target||target==pawn){target=nullptr;return false;}
     if(detail)*detail=initialDetail;
     return originalCanAbility(ability,pawn,target,reason,detail);
 }
@@ -900,26 +906,66 @@ bool canAbility(void* ability,void* pawn,void* target,uint8_t* reason,bool* deta
     void* chosen{};return routeAbility(ability,pawn,combat,reason,detail,chosen);
 }
 void* focusActor(void* focus) {
-    if(live()&&abilityPlan&&abilityPlan->focus==focus)return resolve(abilityPlan->actor);
+    if(live()&&abilityPlan&&abilityPlan->focus==focus){
+        syncSession();
+        return abilityPlan->owner==ownerId&&abilityPlan->intent==lockIntent&&resolve(abilityPlan->owner)?
+            resolve(abilityPlan->actor):nullptr;
+    }
     return originalFocusActor(focus);
+}
+bool activationTarget(void* focus,void* ability,void* pawn,void* combat,void*& target) {
+    uint8_t reason{};bool detail{};
+    const auto owner=ownerId;const auto intent=lockIntent;
+    bool accepted{};
+    if(!abilityCombat(pawn)){
+        target=originalFocusActor(focus);
+        accepted=originalCanAbility(ability,pawn,target,&reason,&detail);
+    }else accepted=routeAbility(ability,pawn,combat,&reason,&detail,target,true);
+    if(!accepted||!identity(target).address||!abilityPlayer(pawn)||owner!=ownerId||intent!=lockIntent){
+        if(settings.debugLogging)++metrics.abilityRejected;
+        return false;
+    }
+    return true;
 }
 bool planAbility(void* focus,void* ability) {
     auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
-    auto combat=abilityCombat(pawn);
+    auto combat=abilityPlayer(pawn);
     // Respect specialised native activation overrides rather than calling a
     // base validator on an unknown ability implementation.
-    if(!ability||!combat||checkingAbility||field<uint8_t>(focus,0x270)!=0||
+    if(!ability||!combat||checkingAbility||
        method<CanAbility>(ability,0x4d0)!=at<CanAbility>(Build::CanAbility))
         return originalPlanAbility(focus,ability);
     struct Restore {bool checking;AbilityPlan* plan;~Restore(){checkingAbility=checking;abilityPlan=plan;}} restore{checkingAbility,abilityPlan};
     checkingAbility=true;
-    uint8_t reason{};bool detail{};void* target{};
+    void* target{};
     // Recheck current aim at activation, even inside the availability cache window.
-    if(!routeAbility(ability,pawn,combat,&reason,&detail,target,true))return false;
-    AbilityPlan plan{focus,identity(target)};
-    if(!plan.actor.address||!abilityCombat(pawn))return false;
+    if(!activationTarget(focus,ability,pawn,combat,target))return false;
+    AbilityPlan plan{focus,identity(target),ability,ownerId,lockIntent};
     abilityPlan=&plan;
     return originalPlanAbility(focus,ability);
+}
+void instantAbility(void* focus,void* ability) {
+    // Check an existing scope before any native fallback: a context can have
+    // been invalidated by callbacks between planning and instant execution.
+    if(live()&&abilityPlan&&abilityPlan->focus==focus&&abilityPlan->ability==ability){
+        if(focusActor(focus))originalInstantAbility(focus,ability);
+        else if(settings.debugLogging)++metrics.abilityRejected;
+        return;
+    }
+    auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
+    auto combat=abilityPlayer(pawn);
+    if(!ability||!combat||method<CanAbility>(ability,0x4d0)!=at<CanAbility>(Build::CanAbility)){
+        originalInstantAbility(focus,ability);return;
+    }
+    // A nested availability callback must not execute an unvalidated cast.
+    if(checkingAbility){if(settings.debugLogging)++metrics.abilityRejected;return;}
+    struct Restore {bool checking;AbilityPlan* plan;~Restore(){checkingAbility=checking;abilityPlan=plan;}} restore{checkingAbility,abilityPlan};
+    checkingAbility=true;
+    void* target{};
+    if(!activationTarget(focus,ability,pawn,combat,target))return;
+    AbilityPlan plan{focus,identity(target),ability,ownerId,lockIntent};
+    abilityPlan=&plan;
+    originalInstantAbility(focus,ability);
 }
 void loseLock(void* combat,void* target,float duration) {
     const TemporaryLoss loss{combat,duration};const auto previous=temporaryLoss;
@@ -1140,6 +1186,7 @@ bool start(std::wstring& error) {
         if(focusSupported){
             hook(Build::CanAbility,&canAbility,originalCanAbility);
             hook(Build::PlanAbility,&planAbility,originalPlanAbility);
+            hook(Build::InstantAbility,&instantAbility,originalInstantAbility);
             hook(Build::FocusActor,&focusActor,originalFocusActor);
         }
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);

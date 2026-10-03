@@ -5,6 +5,7 @@
 namespace CombatCamera::Build {
 inline constexpr uintptr_t CanAbility=0x5d9e0c0;
 inline constexpr uintptr_t PlanAbility=0x5e06dc8;
+inline constexpr uintptr_t InstantAbility=0x5df1580;
 inline constexpr uintptr_t FocusActor=0x5df8810;
 inline constexpr uintptr_t Tick=0x16ecdb8;
 inline constexpr uintptr_t Switch=0x5e1ff84;

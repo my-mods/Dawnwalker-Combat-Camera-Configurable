@@ -288,6 +288,9 @@ thread_local FocusQuery* focusQuery{};
 struct AbilityPlan {void* focus;Identity actor;void* ability;Identity owner;uint64_t intent;};
 thread_local AbilityPlan* abilityPlan{};
 thread_local bool checkingAbility{};
+bool spellValidationSupported{};
+uint64_t abilityTraceWindow{};
+unsigned abilityTraceCount{};
 struct Metrics {
     uint64_t requests{},pickCalls{},candidates{},dwellChecks{},skipped{},draw{},assist{},ticks{},micros{};
     uint64_t lockChanges{},blockedTargets{};
@@ -296,7 +299,7 @@ struct Metrics {
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{},trackedClears{},recoveryAttempts{},recoveryMicros{};
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
     uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{};
-    uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{};
+    uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{},abilityTraceSuppressed{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -316,6 +319,7 @@ void report(uint64_t now) {
         L" focusQueries="+std::to_wstring(metrics.focusQueries)+L" focusTargets="+std::to_wstring(metrics.focusTargets)+
         L" focusUs="+std::to_wstring(metrics.focusMicros)+
         L" abilityRejected="+std::to_wstring(metrics.abilityRejected)+
+        L" abilityTraceSuppressed="+std::to_wstring(metrics.abilityTraceSuppressed)+
         L" directionUs="+std::to_wstring(metrics.directionMicros)+
         L" cameraMode="+std::to_wstring(settings.cameraMode)+L" trackingSteps="+std::to_wstring(metrics.trackingSteps)+
         L" viewChecks="+std::to_wstring(cameraMetrics.viewChecks.exchange(0))+L" viewOtherThread="+std::to_wstring(cameraMetrics.viewOtherThread.exchange(0))+
@@ -913,8 +917,32 @@ void* focusActor(void* focus) {
     }
     return originalFocusActor(focus);
 }
-bool activationTarget(void* focus,void* ability,void* pawn,void* combat,void*& target) {
-    uint8_t reason{};bool detail{};
+bool activationValidator(void* ability) {
+    auto validator=method<CanAbility>(ability,0x4d0);
+    return validator==at<CanAbility>(Build::CanAbility)||
+        (spellValidationSupported&&validator==at<CanAbility>(Build::SpellCanAbility));
+}
+void traceAbility(const wchar_t* stage,const wchar_t* outcome,void* focus,void* ability,void* pawn,void* target,unsigned reason=0) {
+    if(!settings.debugLogging||!live())return;
+    const auto now=GetTickCount64();
+    if(!abilityTraceWindow||now-abilityTraceWindow>=10000){abilityTraceWindow=now;abilityTraceCount=0;}
+    if(abilityTraceCount>=16){++metrics.abilityTraceSuppressed;return;}
+    ++abilityTraceCount;
+    auto name=[](void* object){
+        if(!identity(object).address)return std::wstring(L"none");
+        return reinterpret_cast<RC::Unreal::UObject*>(object)->GetName().substr(0,128);
+    };
+    const auto focusId=identity(focus),abilityId=identity(ability),targetId=identity(target),pawnId=identity(pawn);
+    const auto validator=abilityId.address?reinterpret_cast<uintptr_t>(method<CanAbility>(ability,0x4d0)):0;
+    RC::Output::send(std::wstring(L"[CombatCamera] ability-cast stage=")+stage+L" outcome="+outcome+
+        L" ability="+name(ability)+L" validator="+std::to_wstring(validator>=moduleBase?validator-moduleBase:validator)+
+        L" target="+(targetId.address?(target==pawn?std::wstring(L"self"):name(target)):std::wstring(L"none"))+
+        L" targetIndex="+std::to_wstring(targetId.index)+L" playerIndex="+std::to_wstring(pawnId.index)+
+        L" locked="+std::to_wstring(playerLocked)+L" focusMode="+std::to_wstring(focusId.address?field<uint8_t>(focus,0x270):255)+
+        L" reason="+std::to_wstring(reason)+L"\n");
+}
+bool activationTarget(void* focus,void* ability,void* pawn,void* combat,void*& target,uint8_t& reason) {
+    bool detail{};
     const auto owner=ownerId;const auto intent=lockIntent;
     bool accepted{};
     if(!abilityCombat(pawn)){
@@ -932,14 +960,18 @@ bool planAbility(void* focus,void* ability) {
     auto combat=abilityPlayer(pawn);
     // Respect specialised native activation overrides rather than calling a
     // base validator on an unknown ability implementation.
-    if(!ability||!combat||checkingAbility||
-       method<CanAbility>(ability,0x4d0)!=at<CanAbility>(Build::CanAbility))
+    if(!ability||!combat||checkingAbility||!activationValidator(ability)){
+        traceAbility(L"plan",!ability?L"native-missing-ability":!combat?L"native-unmanaged":checkingAbility?L"native-nested":L"native-unknown-validator",focus,ability,pawn,nullptr);
         return originalPlanAbility(focus,ability);
+    }
     struct Restore {bool checking;AbilityPlan* plan;~Restore(){checkingAbility=checking;abilityPlan=plan;}} restore{checkingAbility,abilityPlan};
     checkingAbility=true;
-    void* target{};
+    void* target{};uint8_t reason{};
     // Recheck current aim at activation, even inside the availability cache window.
-    if(!activationTarget(focus,ability,pawn,combat,target))return false;
+    if(!activationTarget(focus,ability,pawn,combat,target,reason)){
+        traceAbility(L"plan",L"rejected",focus,ability,pawn,target,reason);return false;
+    }
+    traceAbility(L"plan",L"validated",focus,ability,pawn,target);
     AbilityPlan plan{focus,identity(target),ability,ownerId,lockIntent};
     abilityPlan=&plan;
     return originalPlanAbility(focus,ability);
@@ -954,15 +986,19 @@ void instantAbility(void* focus,void* ability) {
     }
     auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
     auto combat=abilityPlayer(pawn);
-    if(!ability||!combat||method<CanAbility>(ability,0x4d0)!=at<CanAbility>(Build::CanAbility)){
+    if(!ability||!combat||!activationValidator(ability)){
+        traceAbility(L"instant",!ability?L"native-missing-ability":!combat?L"native-unmanaged":L"native-unknown-validator",focus,ability,pawn,nullptr);
         originalInstantAbility(focus,ability);return;
     }
     // A nested availability callback must not execute an unvalidated cast.
-    if(checkingAbility){if(settings.debugLogging)++metrics.abilityRejected;return;}
+    if(checkingAbility){if(settings.debugLogging)++metrics.abilityRejected;traceAbility(L"instant",L"reentrant-rejected",focus,ability,pawn,nullptr);return;}
     struct Restore {bool checking;AbilityPlan* plan;~Restore(){checkingAbility=checking;abilityPlan=plan;}} restore{checkingAbility,abilityPlan};
     checkingAbility=true;
-    void* target{};
-    if(!activationTarget(focus,ability,pawn,combat,target))return;
+    void* target{};uint8_t reason{};
+    if(!activationTarget(focus,ability,pawn,combat,target,reason)){
+        traceAbility(L"instant",L"rejected",focus,ability,pawn,target,reason);return;
+    }
+    traceAbility(L"instant",L"validated",focus,ability,pawn,target);
     AbilityPlan plan{focus,identity(target),ability,ownerId,lockIntent};
     abilityPlan=&plan;
     originalInstantAbility(focus,ability);
@@ -1165,6 +1201,15 @@ bool start(std::wstring& error) {
         catch(const std::exception& failure){
             focusSupported=false;const std::string reason=failure.what();
             RC::Output::send(L"[CombatCamera] Unlocked ability targeting unavailable: "+std::wstring(reason.begin(),reason.end())+L". Camera features remain available.\n");
+        }
+        if(focusSupported){
+            try{
+                NativeCompatibility::validateContract(moduleBase,Build::spellValidationCode,std::array<NativeCompatibility::Pointer,0>{});
+                spellValidationSupported=true;
+            }catch(const std::exception& failure){
+                const std::string reason=failure.what();
+                RC::Output::send(L"[CombatCamera] Spell activation guard unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other ability and camera features remain available.\n");
+            }
         }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's validated FName constructor. Store only value IDs; resolve

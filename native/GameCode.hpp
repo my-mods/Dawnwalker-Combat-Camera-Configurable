@@ -3,6 +3,11 @@
 #pragma once
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
+// SpellAbilityBase forwards all five validation arguments to CanAbility.
+// Keep this optional contract separate so a changed wrapper only disables its route.
+inline constexpr std::array<NativeCompatibility::Code,1> spellValidationCode{{
+{0x5deea44,29,"a4378f7f74df0a512ee94af0d205ddb3181bf2d2fb71cccf39a683bb6ee0ef8e"},
+}};
 // Optional ability validation and native planning/getter consumers.
 inline constexpr std::array<NativeCompatibility::Code,7> focusCode{{
 {0x5d9e0c0,1453,"9e39fa04bec07cc6c5e6fce73c029188768795468a5d399ab06b3473d97bf53e"},

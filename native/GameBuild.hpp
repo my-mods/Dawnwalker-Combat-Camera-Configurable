@@ -4,6 +4,7 @@
 #include <cstdint>
 namespace CombatCamera::Build {
 inline constexpr uintptr_t CanAbility=0x5d9e0c0;
+inline constexpr uintptr_t SpellCanAbility=0x5deea44;
 inline constexpr uintptr_t PlanAbility=0x5e06dc8;
 inline constexpr uintptr_t InstantAbility=0x5df1580;
 inline constexpr uintptr_t FocusActor=0x5df8810;

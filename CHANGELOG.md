@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Prevent enemy-targeted instant casts from falling back to the player when no valid enemy is available.
+- Prevent enemy-targeted spells and instant casts from falling back to the player when no valid enemy is available.
 
 ## 3.4.0
 

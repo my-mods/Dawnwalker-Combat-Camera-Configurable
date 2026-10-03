@@ -19,6 +19,7 @@ EXPORTS
 ?GetFunctionFlags@UFunction@Unreal@RC@@QEAAAEAIXZ
 ?GetInterfaces@UClass@Unreal@RC@@QEAAAEAV?$TArray@UFImplementedInterface@Unreal@RC@@V?$TSizedDefaultAllocator@$0CA@@23@@23@XZ
 ?GetInternalIndex@UObjectBase@Unreal@RC@@QEAAHXZ
+?GetName@UObject@Unreal@RC@@QEBA?AV?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@XZ
 ?GetNext@UField@Unreal@RC@@QEAAAEAV?$TObjectPtr@VUField@Unreal@RC@@@23@XZ
 ?GetNextFFieldUnsafe@FField@Unreal@RC@@AEAAPEAV123@XZ
 ?GetOffset_Internal@FProperty@Unreal@RC@@QEAAAEAHXZ

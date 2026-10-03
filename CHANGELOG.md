@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 3.4.1
 
-- Prevent enemy-targeted spells and instant casts from falling back to the player when no valid enemy is available.
+- Fix enemy-targeted spells such as LifeDrain sometimes targeting your own character.
 
 ## 3.4.0
 

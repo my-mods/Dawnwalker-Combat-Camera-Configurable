@@ -1,1 +1,1 @@
-Recover tracked enemies, even behind the camera. Add an optional speed boost to camera tracking for large turns.
+Fix enemy-targeted spells such as LifeDrain sometimes targeting your own character.

@@ -2,6 +2,6 @@
 
 This mod lets you change its settings [b]without reloading your save[/b]. Open [b][color=#A8D5C2]Mod Settings[/color][/b], make your changes and press [b][color=#A8D5C2]Apply[/color][/b] to use them straight away.
 
-[b][color=#A8D5C2]You need:[/color][/b] [url=https://www.nexusmods.com/thebloodofdawnwalker/mods/271]Mod Setting Menu[/url] [b]1.0.6 or newer[/b].
+[b][color=#A8D5C2]You need:[/color][/b] [url=https://www.nexusmods.com/thebloodofdawnwalker/mods/271]Mod Setting Menu[/url].
 
 For live Apply, keep [code]HookProcessConsoleExec = 1[/code] enabled in your Vortex-managed UE4SS configuration.

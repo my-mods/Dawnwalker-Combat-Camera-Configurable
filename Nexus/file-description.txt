@@ -1,1 +1,1 @@
-Fix enemy-targeted spells such as LifeDrain sometimes targeting your own character.
+Keep the camera framing when using abilities while unlocked. Restore the normal Voracious Bite camera and pause camera-directed target switching during its transition.

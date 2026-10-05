@@ -19,7 +19,7 @@ Choose free camera, smooth target tracking or native tracking during combat in *
 ## Requirements
 
 - The Blood of Dawnwalker for PC, with the native functions supported by the bundled integration. Reference build: **1.0.5 / Steam 25232147**.
-- A Dawnwalker-compatible UE4SS installation providing the imported C++ mod and Lua APIs. Framecore 2b and Vercadi RC6 are tested references; their version names and DLL hashes are not runtime restrictions.
+- Required: [UE4SS for Dawnwalker by Vercadi](https://www.nexusmods.com/thebloodofdawnwalker/mods/18) **1.3 (RC6) or later**. The loader must provide the C++ mod, Lua and object APIs used by the mod.
 - [Mod Setting Menu 1.0.6 or later](https://www.nexusmods.com/thebloodofdawnwalker/mods/271) for the in-game controls and live settings changes.
 
 ## Installation
@@ -101,4 +101,4 @@ Unlocked attack direction uses camera yaw, so looking up or down keeps attacks h
 
 Inspired by [Free Combat Camera Ã¢â‚¬â€œ Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340) by xxxxxMIKxxxxx. This is an independent implementation: no code from the original mod was copied or reused. The original mod is not required, and its DLL, configuration and bootstrap are not included.
 
-Thanks to the UE4SS contributors, the Dawnwalker Framecore maintainers, the Mod Setting Menu author for the documented settings client, and Tsuda Kageyu and contributors for MinHook. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Thanks to the UE4SS contributors, Vercadi, the Mod Setting Menu author for the documented settings client, and Tsuda Kageyu and contributors for MinHook. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

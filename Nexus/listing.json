@@ -26,9 +26,10 @@
   },
   "requirements": [
     {
-      "name": "UE4SS for BoD",
-      "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/283",
-      "version": "Framecore version 2b"
+      "name": "UE4SS for Dawnwalker by Vercadi",
+      "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/18",
+      "version": "1.3 (RC6) or later",
+      "minimumVersion": "1.3"
     },
     {
       "name": "Mod Setting Menu",
@@ -39,5 +40,6 @@
   "externalRequirements": [],
   "source": "https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable",
   "codeLicense": "MIT",
-  "permissionsNote": "Original code may be used, modified, converted and redistributed, including commercially, under the MIT license. Retain the license and third-party notices. This grant does not cover third-party gameplay imagery or change the terms of bundled dependencies."
+  "permissionsNote": "Original code may be used, modified, converted and redistributed, including commercially, under the MIT license. Retain the license and third-party notices. This grant does not cover third-party gameplay imagery or change the terms of bundled dependencies.",
+  "requirementsMode": "file-to-file"
 }

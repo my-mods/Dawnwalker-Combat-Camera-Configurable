@@ -1,0 +1,24 @@
+{
+  "nexusUrl": "https://www.nexusmods.com/thebloodofdawnwalker/mods/480",
+  "requirementsMode": "file-to-file",
+  "fileVersionId": "41742787152885",
+  "version": "3.4.1",
+  "dependency_definitions": [
+    {
+      "ranges": [
+        {
+          "min_version_id": "41742787151451",
+          "max_version_id": null
+        }
+      ]
+    },
+    {
+      "ranges": [
+        {
+          "min_version_id": "41742787151548",
+          "max_version_id": null
+        }
+      ]
+    }
+  ]
+}

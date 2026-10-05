@@ -49,14 +49,16 @@ std::atomic_bool active{},installed{};
 // identity match; camera callbacks never inspect UObjects or gameplay fields.
 std::atomic<void*> cameraOwner{};
 std::atomic_bool cameraLogging{};
-struct CameraMetrics {std::atomic_uint64_t checks{},accepted{},otherThread{},attachPrevented{},initialDetaches{},viewChecks{},viewOtherThread{};} cameraMetrics;
+struct CameraMetrics {std::atomic_uint64_t checks{},accepted{},otherThread{},attachPrevented{},initialDetaches{},viewChecks{},viewOtherThread{},scriptedStarts{},scriptedEnds{},scriptedEntries{};} cameraMetrics;
 bool cameraInitialized{};
+bool scriptedCamera{},effectCameraSupported{};
+thread_local void* startingEffectOwner{};
 Settings settings;
 DWORD gameThread{};
 bool attempted{};
 bool inputSupported{true};
 std::wstring startError;
-std::array<void*,34> hooked{};size_t hookCount{};
+std::array<void*,35> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -178,7 +180,7 @@ void clearSession() {
     ++lockIntent;clearDeath();
     attackerSelectionInvalidated=true;
     abilityTargetId={};abilityActorId={};abilityQueried=false;
-    cameraInitialized=false;
+    cameraInitialized=false;scriptedCamera=false;
     nativeCamera=false;clearTracking();clearRecovery();clearAttacker();
     cameraOwner.store(nullptr,std::memory_order_release);
     ownerId={};castLockId={};assistTargetId={};pendingId={};dwell.clear();nextFallback=false;assistScale=1;assistAt=0;playerLocked=false;clearAttackPending=true;
@@ -209,8 +211,7 @@ int gameplay(void* pawn,bool cameraContext=false,bool focusView=false) {
     // verified focus-view callers may retain camera control in that state.
     if(!focusView&&(field<uint8_t>(pc,0x4c8)&2))return 0;
     const auto action=field<uint8_t>(combat,0xb28);
-    // Dead is outside gameplay. Synchronised actions retain native targeting
-    // rules, but are not an exception to free camera while player-controlled.
+    // Synchronised actions belong to the game's camera and targeting rules.
     if(action==10||(!cameraContext&&action==11))return 0;
     return (field<uint8_t>(combat,0x8e)&0x10)&&field<uint8_t>(combat,0xdb8)<=2&&field<uint8_t>(combat,0xdbc)==0?2:1;
 }
@@ -219,14 +220,40 @@ bool managed(void* combat,bool cameraContext=false) {
     if(field<void*>(combat,0)!=at<void*>(Build::PlayerCombatVtable))return false;
     syncSession();
     auto pawn=field<void*>(combat,0xa8);
-    if(!gameplay(pawn,true)||field<void*>(pawn,0xc90)!=combat){
+    if(!gameplay(pawn,true,startingEffectOwner==combat)||field<void*>(pawn,0xc90)!=combat){
         auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
         if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();clearDeath();}
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
     if(id!=ownerId){clearSession();ownerId=id;session.watched[0]=id.index;}
-    const bool native=settings.cameraMode==2&&playerLocked&&field<void*>(combat,0x1380);
+    bool scripted=field<uint8_t>(combat,0xb28)==11||startingEffectOwner==combat;
+    // Effects can outlive the synchronised action, including their blend out.
+    // Inspect the owning manager's small stack only on adoption or while a
+    // scripted handoff is outstanding. Activation wakes this path immediately.
+    // Nothing from this borrowed array is retained across native calls.
+    if(!scripted&&effectCameraSupported&&(scriptedCamera||!cameraInitialized)){
+        auto pc=field<void*>(pawn,0x2e8),camera=field<void*>(pc,0x370);
+        if(camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)){
+            struct Entry {int handle,padding;void* mode;};
+            struct Stack {Entry* data;int size,capacity;};
+            static_assert(sizeof(Entry)==16&&sizeof(Stack)==16);
+            const auto stack=field<Stack>(camera,0xa70);
+            if(stack.size<0||stack.size>64||stack.size>stack.capacity||(!stack.data&&stack.size))scripted=true;
+            else for(int i=0;i<stack.size;++i){
+                if(settings.debugLogging)++cameraMetrics.scriptedEntries;
+                auto mode=stack.data[i].mode;
+                if(mode&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)&&
+                   field<void*>(mode,0x20)==camera&&field<uint8_t>(mode,0x814)!=3){scripted=true;break;}
+            }
+        }
+    }
+    if(scripted!=scriptedCamera){
+        scriptedCamera=scripted;clearTracking();clearRecovery();clearAttackerPending();clearAttackerLook();
+        pendingId={};session.watched[3]=-1;nextFallback=false;assistScale=1;assistAt=0;
+        if(settings.debugLogging){if(scripted)++cameraMetrics.scriptedStarts;else ++cameraMetrics.scriptedEnds;}
+    }
+    const bool native=scripted||(settings.cameraMode==2&&playerLocked&&field<void*>(combat,0x1380));
     cameraOwner.store(native?nullptr:combat,std::memory_order_release);
     // Reconcile once on adoption or a policy transition. No repeated detach
     // repair, native lock broadcast or per-frame attachment writes.
@@ -239,8 +266,25 @@ bool managed(void* combat,bool cameraContext=false) {
             if(settings.debugLogging)cameraMetrics.initialDetaches.fetch_add(1,std::memory_order_relaxed);
         }
     }
-    if(!cameraContext&&field<uint8_t>(combat,0xb28)==11)return false;
+    if(!cameraContext&&scripted)return false;
     return true;
+}
+using EffectStart=void(*)(void*);EffectStart originalEffectStart{};
+void effectStart(void* mode) {
+    // Revoke the free-camera publication before the effect captures its native
+    // framing. The native start also runs for other players: leave those alone.
+    auto previous=startingEffectOwner;
+    if(live()&&mode){
+        syncSession();auto combat=resolve(ownerId);
+        if(combat){
+            auto pawn=field<void*>(combat,0xa8),pc=pawn?field<void*>(pawn,0x2e8):nullptr;
+            auto camera=pc?field<void*>(pc,0x370):nullptr;
+            if(camera&&field<void*>(mode,0x20)==camera&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)){
+                startingEffectOwner=combat;managed(combat,true);
+            }
+        }
+    }
+    originalEffectStart(mode);startingEffectOwner=previous;
 }
 bool eligible(void* combat,bool acquiring=false) {
     if(!managed(combat)||(!playerLocked&&!acquiring)||!(field<uint8_t>(combat,0x8e)&0x10)||
@@ -316,6 +360,9 @@ void report(uint64_t now) {
         L" cameraChecks="+std::to_wstring(cameraMetrics.checks.exchange(0))+L" cameraOtherThread="+std::to_wstring(cameraMetrics.otherThread.exchange(0))+
         L" attachPrevented="+std::to_wstring(cameraMetrics.attachPrevented.exchange(0))+
         L" initialDetaches="+std::to_wstring(cameraMetrics.initialDetaches.exchange(0))+
+        L" scriptedStarts="+std::to_wstring(cameraMetrics.scriptedStarts.exchange(0))+
+        L" scriptedEnds="+std::to_wstring(cameraMetrics.scriptedEnds.exchange(0))+
+        L" scriptedEntries="+std::to_wstring(cameraMetrics.scriptedEntries.exchange(0))+
         L" crosshair="+std::to_wstring(metrics.draw)+L" assist="+std::to_wstring(metrics.assist)+
         L" lockChanges="+std::to_wstring(metrics.lockChanges)+L" blockedTargets="+std::to_wstring(metrics.blockedTargets)+
         L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
@@ -777,6 +824,8 @@ void setTarget(void* combat,void* target) {
     // native target write after a nested Apply, unlock or owner invalidation.
     if(autoAcquiring&&(!live()||acquireIntent!=lockIntent||!settings.autoLockOnHit))return;
     const bool local=managed(combat,target==nullptr&&settings.autoLockOnHit);
+    if((!local||(scriptedCamera&&ownerId.address==reinterpret_cast<uintptr_t>(combat)))&&
+       (automaticRequest||attackerSelecting||nearestSelecting))return;
     if(autoAcquiring&&!local)return;
     if(recovering&&selecting==combat&&(!local||!live()||settings.cameraMode!=1||!playerLocked||
        recoveryIntent!=lockIntent||!recoveryRemaining||
@@ -932,7 +981,7 @@ void blendView(void* controller,void* target,float duration,uint8_t function,flo
                caller==Build::FocusTargetViewReturn)){
         syncSession();
         auto combat=resolve(ownerId);
-        if(combat&&!playerLocked){
+        if(combat&&!playerLocked&&!scriptedCamera&&field<uint8_t>(combat,0xb28)!=11){
             auto pawn=field<void*>(combat,0xa8);
             if(pawn&&field<void*>(pawn,0x2e8)==controller&&field<void*>(pawn,0xc90)==combat&&
                gameplay(pawn,true,true)==2){
@@ -1201,6 +1250,7 @@ void configure(Settings value) {
     cameraMetrics.checks=0;cameraMetrics.accepted=0;cameraMetrics.otherThread=0;
     cameraMetrics.attachPrevented=0;cameraMetrics.initialDetaches=0;
     cameraMetrics.viewChecks=0;cameraMetrics.viewOtherThread=0;
+    cameraMetrics.scriptedStarts=0;cameraMetrics.scriptedEnds=0;cameraMetrics.scriptedEntries=0;
     // The first nine ABI values and legacy freeCamera key remain readable.
     // Camera/targeting Apply preserves the explicit lock-button choice.
     if(cameraChanged){cameraInitialized=false;clearTracking();if(recoveryRemaining)clearAttackerHeld();clearRecovery();}
@@ -1242,6 +1292,11 @@ bool start(std::wstring& error) {
             focusViewSupported=false;const std::string reason=failure.what();
             RC::Output::send(L"[CombatCamera] Unlocked ability camera protection unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera and ability features remain available.\n");
         }
+        try{NativeCompatibility::validateContract(moduleBase,Build::effectCameraCode,Build::effectCameraPointers);effectCameraSupported=true;}
+        catch(const std::exception& failure){
+            effectCameraSupported=false;const std::string reason=failure.what();
+            RC::Output::send(L"[CombatCamera] Scripted effect-camera handoff unavailable: "+std::wstring(reason.begin(),reason.end())+L". Synchronised-action protection and other features remain available.\n");
+        }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's validated FName constructor. Store only value IDs; resolve
         // input action names once on the game thread at startup.
@@ -1266,6 +1321,7 @@ bool start(std::wstring& error) {
             hook(Build::FocusActor,&focusActor,originalFocusActor);
         }
         if(focusViewSupported)hook(Build::BlendView,&blendView,originalBlendView);
+        if(effectCameraSupported)hook(Build::EffectStart,&effectStart,originalEffectStart);
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);

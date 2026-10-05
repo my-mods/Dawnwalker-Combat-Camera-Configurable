@@ -3,6 +3,21 @@
 #pragma once
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
+// Native effect-camera activation, stack ownership and blend lifetime.
+inline constexpr std::array<NativeCompatibility::Code,8> effectCameraCode{{
+{0x1b821ac,615,"dfef4f7c013b24416f6eedfdbd4e7d706867953f56787b1e89a5084de6babd97"},
+{0x5dfb944,925,"f00cec43f266a9bf4a7087e35a6777b080872f7c0e0b5ae2eccdb9bb25080275"},
+{0x5ccfa7c,913,"3ff25b96c5973ff9f10c70600a34b52eca72ae106ee4c2303577f2e64b233998"},
+{0x238c978,85,"86795a8520306df253e2550abff70b83ee1a231aee202c07cc65afb4794af5cf"},
+{0x17d198c,155,"6b35f2eb91ec086b1a497b07b1e264e289a8eb20b0011686a65a8de28fb28b04"},
+{0x238ca10,157,"cf13ac093907071ff7977f41eb046d43d9b63bba16615b73694d6bed4e3dd851"},
+{0x1ad98e8,240,"2a568bf1cffb35b1f6f467b4b8089ebfdce5928699d7fd7cd0895c46d252ddef"},
+{0x17ceb94,14,"16885eca982e71b0efd7ba9a3c0f823b55e85c82a048c426f3b84c047f71b3b4"},
+}};
+inline constexpr std::array<NativeCompatibility::Pointer,2> effectCameraPointers{{
+{0x768b520,0x5dfb944},
+{0x768b538,0x17d198c},
+}};
 // Optional focus-camera requests. A changed route preserves the other hooks.
 inline constexpr std::array<NativeCompatibility::Code,3> focusViewCode{{
 {0x52f028c,172,"aa584be877c8eb57a9ca9aea5563d8c7ef04f06800ab54f00b262b2278cbee1f"},

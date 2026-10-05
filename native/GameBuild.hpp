@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 namespace CombatCamera::Build {
+inline constexpr uintptr_t EffectStart=0x5dfb944;
+inline constexpr uintptr_t EffectCameraVtable=0x768b240;
 inline constexpr uintptr_t CanAbility=0x5d9e0c0;
 inline constexpr uintptr_t SpellCanAbility=0x5deea44;
 inline constexpr uintptr_t PlanAbility=0x5e06dc8;

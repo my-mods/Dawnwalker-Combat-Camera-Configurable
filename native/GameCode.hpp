@@ -3,6 +3,15 @@
 #pragma once
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
+// Optional focus-camera requests. A changed route preserves the other hooks.
+inline constexpr std::array<NativeCompatibility::Code,3> focusViewCode{{
+{0x52f028c,172,"aa584be877c8eb57a9ca9aea5563d8c7ef04f06800ab54f00b262b2278cbee1f"},
+{0x5debe80,768,"71e0e5b3cf142e95dd6abddc1792e080e1286ab5608ed007eef172c88df310c8"},
+{0x5dff16c,147,"c810aa14ac586c35750062a4c8cae3ccdc7b51efc7aa22005a90a7d3973f7e76"},
+}};
+inline constexpr std::array<NativeCompatibility::Pointer,1> focusViewPointers{{
+{0x755f4b8,0x52f028c},
+}};
 // SpellAbilityBase forwards all five validation arguments to CanAbility.
 // Keep this optional contract separate so a changed wrapper only disables its route.
 inline constexpr std::array<NativeCompatibility::Code,1> spellValidationCode{{

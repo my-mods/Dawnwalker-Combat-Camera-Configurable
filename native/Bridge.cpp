@@ -56,7 +56,7 @@ DWORD gameThread{};
 bool attempted{};
 bool inputSupported{true};
 std::wstring startError;
-std::array<void*,32> hooked{};size_t hookCount{};
+std::array<void*,34> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -200,12 +200,14 @@ bool live(){return active.load(std::memory_order_relaxed)&&GetCurrentThreadId()=
 bool sameCurrent(void* object,const Identity& id){return id.address && identity(object)==id;}
 // These relations are checked together, rather than treating a non-null
 // controller/pawn/component pointer as a sufficient gameplay context.
-int gameplay(void* pawn,bool cameraContext=false) {
+int gameplay(void* pawn,bool cameraContext=false,bool focusView=false) {
     if(!pawn||field<uint8_t>(pawn,0x660))return 0;
     auto pc=field<void*>(pawn,0x2e8);auto combat=field<void*>(pawn,0xc90);
     if(!pc||!combat||field<uint8_t>(pc,0x6ec)!=1||field<void*>(pc,0x8b8)!=pawn||
        field<void*>(pc,0x2f8)!=pawn||field<void*>(combat,0xa8)!=pawn||field<int>(pc,0x8c0)!=0)return 0;
-    if(field<uint8_t>(pc,0x4c8)&2)return 0; // Native cursor/menu gate.
+    // Focus itself enables the cursor after requesting its view. Only the
+    // verified focus-view callers may retain camera control in that state.
+    if(!focusView&&(field<uint8_t>(pc,0x4c8)&2))return 0;
     const auto action=field<uint8_t>(combat,0xb28);
     // Dead is outside gameplay. Synchronised actions retain native targeting
     // rules, but are not an exception to free camera while player-controlled.
@@ -261,6 +263,7 @@ using CanAbility=bool(*)(void*,void*,void*,uint8_t*,bool*);CanAbility originalCa
 using PlanAbility=bool(*)(void*,void*);PlanAbility originalPlanAbility{};
 using InstantAbility=void(*)(void*,void*);InstantAbility originalInstantAbility{};
 using FocusActor=void*(*)(void*);FocusActor originalFocusActor{};
+using BlendView=void(*)(void*,void*,float,uint8_t,float,bool);BlendView originalBlendView{};
 using Draw=void(*)(void*);Draw originalDraw{};
 struct InputValue{Vec3 value;int type;int padding;};static_assert(sizeof(InputValue)==32);
 using Modify=InputValue*(*)(void*,InputValue*,void*,const InputValue*,float);Modify originalModify{};
@@ -299,7 +302,7 @@ struct Metrics {
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{},trackedClears{},recoveryAttempts{},recoveryMicros{};
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
     uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{};
-    uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{},abilityTraceSuppressed{};
+    uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{},abilityTraceSuppressed{},abilityViewsPrevented{};
     uint64_t since{};
 } metrics;
 uint64_t clockMicros(){LARGE_INTEGER t,f;QueryPerformanceCounter(&t);QueryPerformanceFrequency(&f);return static_cast<uint64_t>(t.QuadPart/f.QuadPart)*1000000+static_cast<uint64_t>(t.QuadPart%f.QuadPart)*1000000/f.QuadPart;}
@@ -318,6 +321,7 @@ void report(uint64_t now) {
         L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
         L" focusQueries="+std::to_wstring(metrics.focusQueries)+L" focusTargets="+std::to_wstring(metrics.focusTargets)+
         L" focusUs="+std::to_wstring(metrics.focusMicros)+
+        L" abilityViewsPrevented="+std::to_wstring(metrics.abilityViewsPrevented)+
         L" abilityRejected="+std::to_wstring(metrics.abilityRejected)+
         L" abilityTraceSuppressed="+std::to_wstring(metrics.abilityTraceSuppressed)+
         L" directionUs="+std::to_wstring(metrics.directionMicros)+
@@ -922,6 +926,26 @@ bool activationValidator(void* ability) {
     return validator==at<CanAbility>(Build::CanAbility)||
         (spellValidationSupported&&validator==at<CanAbility>(Build::SpellCanAbility));
 }
+void blendView(void* controller,void* target,float duration,uint8_t function,float exponent,bool lockOutgoing) {
+    const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
+    if(live()&&(caller==Build::FocusEnterViewReturn||caller==Build::FocusResumeViewReturn||
+               caller==Build::FocusTargetViewReturn)){
+        syncSession();
+        auto combat=resolve(ownerId);
+        if(combat&&!playerLocked){
+            auto pawn=field<void*>(combat,0xa8);
+            if(pawn&&field<void*>(pawn,0x2e8)==controller&&field<void*>(pawn,0xc90)==combat&&
+               gameplay(pawn,true,true)==2){
+                // Target selection and execution keep their actor. Prevent the
+                // separate focus camera blend before it changes the view target;
+                // no saved rotation, post-cast reset or persistent override.
+                if(settings.debugLogging)++metrics.abilityViewsPrevented;
+                return;
+            }
+        }
+    }
+    originalBlendView(controller,target,duration,function,exponent,lockOutgoing);
+}
 void traceAbility(const wchar_t* stage,const wchar_t* outcome,void* focus,void* ability,void* pawn,void* target,unsigned reason=0) {
     if(!settings.debugLogging||!live())return;
     const auto now=GetTickCount64();
@@ -1110,6 +1134,7 @@ InputValue* modify(void* modifier,InputValue* result,void* input,const InputValu
     return output;
 }
 template<class Fn> void hook(uintptr_t rva,Fn detour,Fn& original) {
+    if(hookCount==hooked.size())throw std::runtime_error("Native hook capacity exhausted");
     auto address=at<void*>(rva);
     if(MH_CreateHook(address,reinterpret_cast<void*>(detour),reinterpret_cast<void**>(&original))!=MH_OK)throw std::runtime_error("Hook creation failed");
     hooked[hookCount++]=address;
@@ -1211,6 +1236,12 @@ bool start(std::wstring& error) {
                 RC::Output::send(L"[CombatCamera] Spell activation guard unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other ability and camera features remain available.\n");
             }
         }
+        bool focusViewSupported=true;
+        try{NativeCompatibility::validateContract(moduleBase,Build::focusViewCode,Build::focusViewPointers);}
+        catch(const std::exception& failure){
+            focusViewSupported=false;const std::string reason=failure.what();
+            RC::Output::send(L"[CombatCamera] Unlocked ability camera protection unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera and ability features remain available.\n");
+        }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's validated FName constructor. Store only value IDs; resolve
         // input action names once on the game thread at startup.
@@ -1234,6 +1265,7 @@ bool start(std::wstring& error) {
             hook(Build::InstantAbility,&instantAbility,originalInstantAbility);
             hook(Build::FocusActor,&focusActor,originalFocusActor);
         }
+        if(focusViewSupported)hook(Build::BlendView,&blendView,originalBlendView);
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);

@@ -49,7 +49,7 @@ std::atomic_bool active{},installed{};
 // identity match; camera callbacks never inspect UObjects or gameplay fields.
 std::atomic<void*> cameraOwner{};
 std::atomic_bool cameraLogging{};
-struct CameraMetrics {std::atomic_uint64_t checks{},accepted{},otherThread{},attachPrevented{},initialDetaches{},viewChecks{},viewOtherThread{},scriptedStarts{},scriptedEnds{},scriptedEntries{};} cameraMetrics;
+struct CameraMetrics {std::atomic_uint64_t checks{},accepted{},otherThread{},attachPrevented{},initialDetaches{},viewChecks{},viewOtherThread{},scriptedStarts{},scriptedEnds{},scriptedEntries{},scriptedInvalidOwners{},scriptedInvalidStacks{};} cameraMetrics;
 bool cameraInitialized{};
 bool scriptedCamera{},effectCameraSupported{};
 thread_local void* startingEffectOwner{};
@@ -208,13 +208,20 @@ int gameplay(void* pawn,bool cameraContext=false,bool focusView=false) {
     auto pc=field<void*>(pawn,0x2e8);auto combat=field<void*>(pawn,0xc90);
     if(!pc||!combat||field<uint8_t>(pc,0x6ec)!=1||field<void*>(pc,0x8b8)!=pawn||
        field<void*>(pc,0x2f8)!=pawn||field<void*>(combat,0xa8)!=pawn||field<int>(pc,0x8c0)!=0)return 0;
-    // Focus itself enables the cursor after requesting its view. Only the
+    // Focus can enable cinematic mode after requesting its view. Only the
     // verified focus-view callers may retain camera control in that state.
     if(!focusView&&(field<uint8_t>(pc,0x4c8)&2))return 0;
     const auto action=field<uint8_t>(combat,0xb28);
     // Synchronised actions belong to the game's camera and targeting rules.
     if(action==10||(!cameraContext&&action==11))return 0;
     return (field<uint8_t>(combat,0x8e)&0x10)&&field<uint8_t>(combat,0xdb8)<=2&&field<uint8_t>(combat,0xdbc)==0?2:1;
+}
+void* playerCameraComponent(void* pawn) {
+    // Native player construction stores RebelCameraComponent at +c58.
+    // Its +a70 mode stack is NOT part of controller+370's camera manager.
+    auto component=field<void*>(pawn,0xc58);
+    return identity(component).address&&field<void*>(component,0)==at<void*>(Build::CameraComponentVtable)&&
+        field<void*>(component,0xa8)==pawn?component:nullptr;
 }
 bool managed(void* combat,bool cameraContext=false) {
     if(!live()||!combat)return false;
@@ -230,22 +237,28 @@ bool managed(void* combat,bool cameraContext=false) {
     if(id!=ownerId){clearSession();ownerId=id;session.watched[0]=id.index;}
     bool scripted=field<uint8_t>(combat,0xb28)==11||startingEffectOwner==combat;
     // Effects can outlive the synchronised action, including their blend out.
-    // Inspect the owning manager's small stack only on adoption or while a
+    // Inspect the owning component's small stack only on adoption or while a
     // scripted handoff is outstanding. Activation wakes this path immediately.
     // Nothing from this borrowed array is retained across native calls.
     if(!scripted&&effectCameraSupported&&(scriptedCamera||!cameraInitialized)){
-        auto pc=field<void*>(pawn,0x2e8),camera=field<void*>(pc,0x370);
-        if(camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)){
+        auto component=playerCameraComponent(pawn);
+        if(!component){
+            scripted=true;
+            if(settings.debugLogging)++cameraMetrics.scriptedInvalidOwners;
+        }else{
             struct Entry {int handle,padding;void* mode;};
             struct Stack {Entry* data;int size,capacity;};
             static_assert(sizeof(Entry)==16&&sizeof(Stack)==16);
-            const auto stack=field<Stack>(camera,0xa70);
-            if(stack.size<0||stack.size>64||stack.size>stack.capacity||(!stack.data&&stack.size))scripted=true;
+            const auto stack=field<Stack>(component,0xa70);
+            if(stack.size<0||stack.size>64||stack.size>stack.capacity||(!stack.data&&stack.size)){
+                scripted=true;
+                if(settings.debugLogging)++cameraMetrics.scriptedInvalidStacks;
+            }
             else for(int i=0;i<stack.size;++i){
                 if(settings.debugLogging)++cameraMetrics.scriptedEntries;
                 auto mode=stack.data[i].mode;
                 if(mode&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)&&
-                   field<void*>(mode,0x20)==camera&&field<uint8_t>(mode,0x814)!=3){scripted=true;break;}
+                   field<void*>(mode,0x20)==component&&field<uint8_t>(mode,0x814)!=3){scripted=true;break;}
             }
         }
     }
@@ -278,9 +291,9 @@ void effectStart(void* mode) {
     if(live()&&mode){
         syncSession();auto combat=resolve(ownerId);
         if(combat){
-            auto pawn=field<void*>(combat,0xa8),pc=pawn?field<void*>(pawn,0x2e8):nullptr;
-            auto camera=pc?field<void*>(pc,0x370):nullptr;
-            if(camera&&field<void*>(mode,0x20)==camera&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)){
+            auto pawn=field<void*>(combat,0xa8);
+            auto component=pawn?playerCameraComponent(pawn):nullptr;
+            if(component&&field<void*>(mode,0x20)==component&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)){
                 startingEffectOwner=combat;managed(combat,true);
             }
         }
@@ -364,6 +377,8 @@ void report(uint64_t now) {
         L" scriptedStarts="+std::to_wstring(cameraMetrics.scriptedStarts.exchange(0))+
         L" scriptedEnds="+std::to_wstring(cameraMetrics.scriptedEnds.exchange(0))+
         L" scriptedEntries="+std::to_wstring(cameraMetrics.scriptedEntries.exchange(0))+
+        L" scriptedInvalidOwners="+std::to_wstring(cameraMetrics.scriptedInvalidOwners.exchange(0))+
+        L" scriptedInvalidStacks="+std::to_wstring(cameraMetrics.scriptedInvalidStacks.exchange(0))+
         L" crosshair="+std::to_wstring(metrics.draw)+L" assist="+std::to_wstring(metrics.assist)+
         L" lockChanges="+std::to_wstring(metrics.lockChanges)+L" blockedTargets="+std::to_wstring(metrics.blockedTargets)+
         L" cameraDirections="+std::to_wstring(metrics.cameraDirections)+L" directionFallbacks="+std::to_wstring(metrics.directionFallbacks)+
@@ -1260,6 +1275,7 @@ void configure(Settings value) {
     cameraMetrics.attachPrevented=0;cameraMetrics.initialDetaches=0;
     cameraMetrics.viewChecks=0;cameraMetrics.viewOtherThread=0;
     cameraMetrics.scriptedStarts=0;cameraMetrics.scriptedEnds=0;cameraMetrics.scriptedEntries=0;
+    cameraMetrics.scriptedInvalidOwners=0;cameraMetrics.scriptedInvalidStacks=0;
     // The first nine ABI values and legacy freeCamera key remain readable.
     // Camera/targeting Apply preserves the explicit lock-button choice.
     if(cameraChanged){cameraInitialized=false;clearTracking();if(recoveryRemaining)clearAttackerHeld();clearRecovery();}

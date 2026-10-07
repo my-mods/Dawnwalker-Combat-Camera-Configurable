@@ -43,6 +43,7 @@ inline constexpr uintptr_t Forward=0x5e127cd;
 inline constexpr uintptr_t FreeDirection=0x5e12bae;
 inline constexpr uintptr_t PlayerCombatVtable=0x7d64078;
 inline constexpr uintptr_t PlayerCameraVtable=0x76a6c58;
+inline constexpr uintptr_t CameraComponentVtable=0x76a3fb8;
 inline constexpr uintptr_t ViewRotation=0x17d22f0;
 inline constexpr uintptr_t ViewRotationReturn=0x1600de9;
 inline constexpr uintptr_t Camera=0x5de7de6;

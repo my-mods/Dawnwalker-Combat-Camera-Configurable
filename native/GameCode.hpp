@@ -4,7 +4,13 @@
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
 // Native effect-camera activation, stack ownership and blend lifetime.
-inline constexpr std::array<NativeCompatibility::Code,8> effectCameraCode{{
+inline constexpr std::array<NativeCompatibility::Code,13> effectCameraCode{{
+// Player +c58 construction, component identity/owner and native stack consumer.
+{0x1bcf340,172,"deda6161d31921a308ceef884e657552e65a28d57d82d02eb5fb6e0ff7651410"},
+{0x1c22490,184,"be5674db931fc795cf32b1c96a88f56ba93b2f5405a6b8e370b58d6a21bc164e"},
+{0x1c23eff,108,"264da1bae96549705090290e281e974ffa0d3c105155de7af85dd6b09617f451"},
+{0x6225f10,125,"393f665056187f87b3759fcbef0639c36958ba45645f2c1e79b4a9f1050d8a73"},
+{0x27e6c70,8,"77c89f3bec3cec8d5caed75e3d04e10c6d3af214ade3cb66b04d8a93f923b651"},
 {0x1b821ac,615,"dfef4f7c013b24416f6eedfdbd4e7d706867953f56787b1e89a5084de6babd97"},
 {0x5dfb944,925,"f00cec43f266a9bf4a7087e35a6777b080872f7c0e0b5ae2eccdb9bb25080275"},
 {0x5ccfa7c,913,"3ff25b96c5973ff9f10c70600a34b52eca72ae106ee4c2303577f2e64b233998"},
@@ -14,7 +20,8 @@ inline constexpr std::array<NativeCompatibility::Code,8> effectCameraCode{{
 {0x1ad98e8,240,"2a568bf1cffb35b1f6f467b4b8089ebfdce5928699d7fd7cd0895c46d252ddef"},
 {0x17ceb94,14,"16885eca982e71b0efd7ba9a3c0f823b55e85c82a048c426f3b84c047f71b3b4"},
 }};
-inline constexpr std::array<NativeCompatibility::Pointer,2> effectCameraPointers{{
+inline constexpr std::array<NativeCompatibility::Pointer,3> effectCameraPointers{{
+{0x76a4678,0x27e6c70},
 {0x768b520,0x5dfb944},
 {0x768b538,0x17d198c},
 }};

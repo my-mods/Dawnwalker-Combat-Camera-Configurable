@@ -73,9 +73,9 @@
       ],
       "pending": {
         "impact": "patch",
-        "rationale": "Complete delta from Nexus 3.4.2: installer/development version provenance and approved page copy additions plus fix overly permissive last-attacker override; signed bounded meaningful camera gesture retains tiny-input attacker priority, preserves deliberate aim and Smooth yielding without settings or ABI changes. Generated native payload rebuilt and verified.",
+        "rationale": "Complete Nexus 3.4.2 delta: development/provenance metadata and approved page copy additions; meaningful last-attacker override gesture; fix persistent scripted-camera rejection by reading the verified player RebelCameraComponent stack rather than camera-manager view floats, with component ownership/lifetime validation and bounded diagnostic counters. No settings or ABI changes. Generated native payload rebuilt and verified.",
         "majorOverride": false,
-        "reviewedInputs": "cc39dc8d8ef6ad8e09b140f948a94f1e63ffbac17dc9b80852be3c6d220c8da4",
+        "reviewedInputs": "f7d68767bdb1074812ef09b31b8b8f7f902cd210f4b682e1f76937b96a616861",
         "divergenceReviewed": false
       }
     }

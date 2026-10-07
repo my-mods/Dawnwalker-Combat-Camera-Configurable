@@ -72,10 +72,10 @@
         "VortexExtension"
       ],
       "pending": {
-        "impact": "patch",
-        "rationale": "Complete Nexus 3.4.2 delta: development/provenance metadata and approved page copy additions; meaningful last-attacker override gesture; fix persistent scripted-camera rejection by reading the verified player RebelCameraComponent stack rather than camera-manager view floats, with component ownership/lifetime validation and bounded diagnostic counters. No settings or ABI changes. Generated native payload rebuilt and verified.",
+        "impact": "minor",
+        "rationale": "Complete direct baseline delta reviewed. Retains preceding scope: Complete Nexus 3.4.2 delta: development/provenance metadata and approved page copy additions; meaningful last-attacker override gesture; fix persistent scripted-camera rejection by reading the verified player RebelCameraComponent stack rather than camera-manager view floats, with component ownership/lifetime validation and bounded diagnostic counters. No settings or ABI changes. Generated native payload rebuilt and verified. Adds compatible cumulative Logging Off/Error/Warning/Info/Debug, default Warning, preference migration and local unchanged-library output boundaries; native logging ABI coordinated with rebuilt DLLs. New option makes the full remaining delta minor.",
         "majorOverride": false,
-        "reviewedInputs": "f7d68767bdb1074812ef09b31b8b8f7f902cd210f4b682e1f76937b96a616861",
+        "reviewedInputs": "457d5c2e58b7ccb5630cfb8a1ccda1d1fdcf43e0a8e52d8e0dc91ce64988bf81",
         "divergenceReviewed": false
       }
     }

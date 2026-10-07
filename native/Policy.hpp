@@ -10,6 +10,7 @@ struct Settings {
     int crosshair{0}, delayMs{65}, coneDegrees{45};
     bool aimAssist{true};
     int assistStrength{35};
+    int logLevel{2};
     bool debugLogging{false};
     int cameraMode{0},trackingSpeed{50},trackingResumeMs{750};
     bool lockLastAttacker{false};

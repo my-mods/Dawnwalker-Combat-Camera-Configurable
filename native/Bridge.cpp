@@ -1141,7 +1141,7 @@ bool fromLockButton(void* combat,void* frame,uintptr_t offset) {
     }
     // A changed player Blueprint must not leave the player unable to lock.
     inputSupported=false;active=false;clearSession();
-    RC::Output::send(L"[CombatCamera] Player target-lock input graph differs from the supported build; mod disabled for this session.\n");
+    if(settings.logLevel>=1)RC::Output::send(L"[CombatCamera][ERROR] Player target-lock input graph differs from the supported build; mod disabled for this session.\n");
     return false;
 }
 void lockScript(void* combat,void* frame,void* result) {
@@ -1300,7 +1300,7 @@ bool start(std::wstring& error) {
         try{NativeCompatibility::validateContract(moduleBase,Build::focusCode,std::array<NativeCompatibility::Pointer,0>{});}
         catch(const std::exception& failure){
             focusSupported=false;const std::string reason=failure.what();
-            RC::Output::send(L"[CombatCamera] Unlocked ability targeting unavailable: "+std::wstring(reason.begin(),reason.end())+L". Camera features remain available.\n");
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Unlocked ability targeting unavailable: "+std::wstring(reason.begin(),reason.end())+L". Camera features remain available.\n");
         }
         if(focusSupported){
             try{
@@ -1308,19 +1308,19 @@ bool start(std::wstring& error) {
                 spellValidationSupported=true;
             }catch(const std::exception& failure){
                 const std::string reason=failure.what();
-                RC::Output::send(L"[CombatCamera] Spell activation guard unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other ability and camera features remain available.\n");
+                if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Spell activation guard unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other ability and camera features remain available.\n");
             }
         }
         bool focusViewSupported=true;
         try{NativeCompatibility::validateContract(moduleBase,Build::focusViewCode,Build::focusViewPointers);}
         catch(const std::exception& failure){
             focusViewSupported=false;const std::string reason=failure.what();
-            RC::Output::send(L"[CombatCamera] Unlocked ability camera protection unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera and ability features remain available.\n");
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Unlocked ability camera protection unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera and ability features remain available.\n");
         }
         try{NativeCompatibility::validateContract(moduleBase,Build::effectCameraCode,Build::effectCameraPointers);effectCameraSupported=true;}
         catch(const std::exception& failure){
             effectCameraSupported=false;const std::string reason=failure.what();
-            RC::Output::send(L"[CombatCamera] Scripted effect-camera handoff unavailable: "+std::wstring(reason.begin(),reason.end())+L". Synchronised-action protection and other features remain available.\n");
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Scripted effect-camera handoff unavailable: "+std::wstring(reason.begin(),reason.end())+L". Synchronised-action protection and other features remain available.\n");
         }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's validated FName constructor. Store only value IDs; resolve

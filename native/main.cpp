@@ -6,19 +6,21 @@
 using namespace RC;
 using Lua=LuaMadeSimple::Lua;
 static_assert(sizeof(CppUserModBase)==192,"Unsupported UE4SS C++ host layout");
+static int nativeLogLevel=2;
 class CombatCameraMod final:public CppUserModBase {
 public:
-    CombatCameraMod(){ ModName=STR("Combat Camera - Configurable");ModVersion=STR("3.4.3-dev");ModAuthors=STR("my-mods"); }
+    CombatCameraMod(){ ModName=STR("Combat Camera - Configurable");ModVersion=STR("3.5.0-dev");ModAuthors=STR("my-mods"); }
     void on_lua_start(StringViewType name,Lua& lua,Lua&,Lua&,Lua*) override {
         if(name!=STR("CombatCamera"))return;
-        lua.register_function("_CCSet",[](const Lua& l){
+        lua.register_function("_CCSetLogV2",[](const Lua& l){
             // get_integer removes the argument from the host Lua stack.
             // Each next setting is therefore at index 1, in Settings.order.
             auto number=[&](int lo,int hi){return static_cast<int>(std::clamp<int64_t>(l.get_integer(1),lo,hi));};
             CombatCamera::Settings s;
             s.enabled=number(0,1)!=0;s.freeCamera=number(0,1)!=0;s.targeting=number(0,1)!=0;
             s.crosshair=number(0,2);s.delayMs=number(0,1000);s.coneDegrees=number(0,90);
-            s.aimAssist=number(0,1)!=0;s.assistStrength=number(0,80);s.debugLogging=number(0,1)!=0;
+            s.aimAssist=number(0,1)!=0;s.assistStrength=number(0,80);s.logLevel=number(0,4);s.debugLogging=s.logLevel==4;
+            nativeLogLevel=s.logLevel;
             s.cameraMode=number(0,2);s.trackingSpeed=number(10,100);s.trackingResumeMs=number(0,3000);
             s.lockLastAttacker=number(0,1)!=0;
             s.autoLockOnHit=number(0,1)!=0;s.afterTargetDeath=number(0,1);
@@ -27,7 +29,7 @@ public:
         });
         lua.register_function("_CCStart",[](const Lua& l){
             std::wstring error;bool ok=CombatCamera::start(error);
-            if(!ok)Output::send(STR("[CombatCamera] Disabled: ")+error+STR("\n"));
+            if(!ok&&nativeLogLevel>=1)Output::send(STR("[CombatCamera] Disabled: ")+error+STR("\n"));
             l.set_bool(ok);return 1;
         });
     }

@@ -1,5 +1,8 @@
 # Changelog
 
+- Choose Off, Error, Warning, Info or Debug logging; Warning is the default.
+
+
 ## 3.4.3-dev
 
 - Keep the latest attacker selected after tiny camera inputs, while still allowing deliberate aiming to choose another enemy.

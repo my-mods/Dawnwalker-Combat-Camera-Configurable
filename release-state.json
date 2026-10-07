@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "packages": {
+    "main": {
+      "id": "CombatCamera",
+      "name": "Combat Camera - Configurable",
+      "archive": "Combat-Camera-Configurable.zip",
+      "packageFormat": 1,
+      "baseline": {
+        "kind": "nexus",
+        "version": "3.4.2",
+        "normalizedVersion": "3.4.2",
+        "sourceCommit": "0642dd8f6a604a72c19a424ff74b8b56d633f3e0",
+        "sourceTag": "v3.4.2",
+        "archiveSha256": "e64a563466205103ca851821511219788a3119242a930cf9785f33d4990eb4f9",
+        "verifiedAt": "2026-10-07T12:13:08.9505377Z",
+        "nexus": {
+          "game": "thebloodofdawnwalker",
+          "pageId": "480",
+          "modId": "41742787150304",
+          "fileChainId": "7960683",
+          "versionId": "41742787152938",
+          "siteFileId": "3114"
+        }
+      },
+      "bindings": [
+        {
+          "path": "Nexus/listing.json",
+          "jsonPointer": [
+            "version"
+          ],
+          "members": [
+            "Nexus/listing.json"
+          ]
+        },
+        {
+          "path": "Nexus/listing.json",
+          "jsonPointer": [
+            "file",
+            "version"
+          ],
+          "members": [
+            "Nexus/listing.json"
+          ]
+        },
+        {
+          "path": "mod_settings.ini",
+          "pattern": "^Version\\s*=\\s*(?P<version>[^\\r\\n]+)",
+          "count": 1,
+          "members": [
+            "Data/CombatCamera/mod_settings.ini"
+          ]
+        },
+        {
+          "path": "native/main.cpp",
+          "pattern": "ModVersion\\s*=\\s*(?:STR\\(|L)?\"(?P<version>[^\"]+)\"",
+          "count": 1,
+          "members": []
+        },
+        {
+          "path": "package/mod.manifest",
+          "pattern": "<version>(?P<version>[^<]+)</version>",
+          "count": 1,
+          "members": [
+            "mod.manifest"
+          ]
+        }
+      ],
+      "excludePaths": [
+        "Optional",
+        "Compatibility",
+        "VortexExtension"
+      ],
+      "pending": {
+        "impact": "patch",
+        "rationale": "Add consistent installer version metadata and identifiable development packages; gameplay matches the published release.",
+        "majorOverride": false,
+        "reviewedInputs": "6ede125a1f08ac903916a4f94f4455121fd8d6f34b792a00447314a4318f9178",
+        "divergenceReviewed": false
+      }
+    }
+  }
+}

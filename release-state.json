@@ -75,7 +75,7 @@
         "impact": "patch",
         "rationale": "Add consistent installer version metadata and identifiable development packages; gameplay matches the published release.",
         "majorOverride": false,
-        "reviewedInputs": "6ede125a1f08ac903916a4f94f4455121fd8d6f34b792a00447314a4318f9178",
+        "reviewedInputs": "5af7edeae4dd4cd0fc85ba72a3c68bfdf7ab10457b0aa58cc2e29d9ab0118f5e",
         "divergenceReviewed": false
       }
     }

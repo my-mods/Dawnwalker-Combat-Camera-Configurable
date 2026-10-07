@@ -73,9 +73,9 @@
       ],
       "pending": {
         "impact": "minor",
-        "rationale": "Complete direct baseline delta reviewed. Retains preceding scope: Complete Nexus 3.4.2 delta: development/provenance metadata and approved page copy additions; meaningful last-attacker override gesture; fix persistent scripted-camera rejection by reading the verified player RebelCameraComponent stack rather than camera-manager view floats, with component ownership/lifetime validation and bounded diagnostic counters. No settings or ABI changes. Generated native payload rebuilt and verified. Adds compatible cumulative Logging Off/Error/Warning/Info/Debug, default Warning, preference migration and local unchanged-library output boundaries; native logging ABI coordinated with rebuilt DLLs. New option makes the full remaining delta minor.",
+        "rationale": "Complete direct Nexus 3.4.2 delta reviewed: compatible five-level Logging/migration/coordinated native ABI, meaningful attacker gesture, corrected RebelCameraComponent scripted stack ownership, release provenance and player documentation, plus bounded verified-death handoff after early clear/current Dead/recovery Dead. Camera acquisition pauses only during one-second confirmation, preserving explicit replacement/hit priority/manual cancellation and shared 50ms/two-pass budgets. Independent P2 resolved; 98 kill scenarios/all old suites, current source menu and native ABI pass. No breaking settings. Consolidated 3.5.0-dev notes.",
         "majorOverride": false,
-        "reviewedInputs": "457d5c2e58b7ccb5630cfb8a1ccda1d1fdcf43e0a8e52d8e0dc91ce64988bf81",
+        "reviewedInputs": "9eb146a3a321ebad38706e472368051353ce1932929a72b60a9d350fb7c312b8",
         "divergenceReviewed": false
       }
     }

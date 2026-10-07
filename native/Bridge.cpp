@@ -74,12 +74,12 @@ Identity identity(void* object) {
     return {reinterpret_cast<uintptr_t>(object),index,item->GetSerialNumber()};
 }
 struct Session final:FUObjectDeleteListener {
-    std::array<std::atomic_int,14> watched;
+    std::array<std::atomic_int,16> watched;
     std::atomic_uint32_t invalidated{};
     Session(){for(auto& x:watched)x.store(-1);}
     void NotifyUObjectDeleted(const UObjectBase*,int32_t index) override {
         uint32_t mask=0;
-        for(size_t i=0;i<14;++i)if(watched[i].load(std::memory_order_relaxed)==index)mask|=1u<<i;
+        for(size_t i=0;i<16;++i)if(watched[i].load(std::memory_order_relaxed)==index)mask|=1u<<i;
         if(mask&1)cameraOwner.store(nullptr,std::memory_order_release);
         if(mask)invalidated.fetch_or(mask,std::memory_order_release);
     }
@@ -87,7 +87,7 @@ struct Session final:FUObjectDeleteListener {
 } session;
 bool listening{};
 void Session::OnUObjectArrayShutdown() {
-    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(0x3fff);
+    active=false;cameraOwner.store(nullptr,std::memory_order_release);invalidated.fetch_or(0xffff);
     // Unregister before the engine checks its shutdown listener registry.
     // Leave hook teardown to stop(); no dying game objects are accessed here.
     if(listening){FUObjectArray::RemoveUObjectDeleteListener(this);listening=false;}
@@ -110,7 +110,16 @@ bool playerLocked{};
 uint64_t lockIntent{};
 double deathRemaining{};
 bool deathFallback{};
-void clearDeath(){deathRemaining=0;deathFallback=false;}
+// A clear is not proof of death: the native OnDeath delegate may run before
+// the Dead state store. Watch only the cleared identity for one gameplay second.
+Identity deathCheckTargetId,deathCheckActorId;
+double deathCheckRemaining{};
+uint64_t deathCheckIntent{};
+void clearDeathCheck(){
+    deathCheckTargetId={};deathCheckActorId={};deathCheckRemaining=0;
+    session.watched[14]=-1;session.watched[15]=-1;
+}
+void clearDeath(){deathRemaining=0;deathFallback=false;clearDeathCheck();}
 bool clearAttackPending{true};
 // Hit callbacks retain only indexed identities. The existing player tick makes
 // one bounded selection attempt after the native hit reaction has completed.
@@ -142,6 +151,7 @@ double recoveryRetry{};
 bool recoveryReady{};
 uint64_t recoveryLookAt{};
 bool recoveryHadLook{};
+uint64_t recoveryDeathIntent{};
 void clearRecovery() {
     if(!recoveryRemaining)return;
     recoveryTargetId={};recoveryActorId={};recoveryRemaining=0;recoveryLookAt=0;recoveryHadLook=false;
@@ -198,6 +208,7 @@ void syncSession() {
     if(mask&768)clearAttackerPending();
     if(mask&3072)clearAttackerHeld();
     if(mask&12288)attackerSelectionInvalidated=true;
+    if(mask&49152)clearDeathCheck();
 }
 bool live(){return active.load(std::memory_order_relaxed)&&GetCurrentThreadId()==gameThread;}
 bool sameCurrent(void* object,const Identity& id){return id.address && identity(object)==id;}
@@ -523,7 +534,10 @@ void updateAssist(void* combat,uint64_t now) {
 }
 void request(void* combat) {
     syncSession();
-    if(inRequest||!settings.targeting||recoveryRemaining||recoveryHold||attackerRemaining||
+    // A missing target may be a reordered death. Do not let camera acquisition
+    // replace the watched identity before its bounded confirmation completes.
+    // Explicit selection, pending hits and same-enemy recovery use other paths.
+    if(inRequest||!settings.targeting||deathCheckRemaining||recoveryRemaining||recoveryHold||attackerRemaining||
        (attackerHeldTargetId.address&&!attackerLookOverride)||!eligible(combat))return;
     auto config=field<void*>(combat,0x9b8);if(!config)return;
     float parameter=field<float>(config,0x26c);
@@ -654,10 +668,15 @@ void applyDeath(void* combat,float delta) {
     nearestTargetId={};nearestActorId={};
     if(settings.debugLogging)metrics.deathMicros+=clockMicros()-before;
 }
+void confirmTargetDeath();
 bool applyRecovery(void* combat) {
     if(!recoveryRemaining||!recoveryReady||recoveryRetry||inRequest||attackerRemaining)return false;
     const auto targetId=recoveryTargetId,actorId=recoveryActorId,expectedOwner=ownerId;
     auto target=resolveAttacker(targetId),actor=resolveAttacker(actorId);
+    if(settings.autoLockOnHit&&playerLocked&&!field<void*>(combat,0x1380)&&
+       recoveryDeathIntent==lockIntent&&target&&actor&&field<void*>(target,0xa8)==actor&&field<uint8_t>(target,0xb28)==10){
+        confirmTargetDeath();return false;
+    }
     if(settings.cameraMode!=1||!playerLocked||field<void*>(combat,0x1380)||
        !target||!actor||field<void*>(target,0xa8)!=actor||field<uint8_t>(target,0xb28)==10){
         if(settings.debugLogging)++metrics.recoveryMisses;
@@ -701,9 +720,40 @@ bool applyRecovery(void* combat) {
     if(settings.debugLogging)metrics.recoveryMicros+=clockMicros()-before;
     return restored;
 }
+void confirmTargetDeath() {
+    playerLocked=false;clearAttackPending=true;
+    clearDeath();clearRecovery();clearTracking();clearAttackerHeld();
+    if(settings.afterTargetDeath==0&&!attackerRemaining)deathRemaining=3.0;
+    if(settings.debugLogging)++metrics.targetDeaths;
+}
+void setTarget(void* combat,void* target);
+void observeTargetDeath(void* combat,float delta) {
+    if(!settings.autoLockOnHit||inRequest)return;
+    // Only an already locked current target is inspected; never discover an
+    // enemy while idle. Preserve native target-clear side effects via the hook.
+    auto current=field<void*>(combat,0x1380);
+    if(playerLocked&&current&&identity(current).address&&field<uint8_t>(current,0xb28)==10){
+        setTarget(combat,nullptr);return;
+    }
+    // A disappearing enemy can die before RegainTargetLock, even when recovery
+    // is not ready. Apply/manual input invalidate this bridge through lockIntent.
+    if(recoveryRemaining&&playerLocked&&!current&&recoveryDeathIntent==lockIntent){
+        auto target=resolveAttacker(recoveryTargetId),actor=resolveAttacker(recoveryActorId);
+        if(target&&actor&&field<void*>(target,0xa8)==actor&&field<uint8_t>(target,0xb28)==10){
+            confirmTargetDeath();return;
+        }
+    }
+    if(!deathCheckRemaining)return;
+    if(current||deathCheckIntent!=lockIntent||!std::isfinite(delta)||delta<0||delta>=deathCheckRemaining){clearDeathCheck();return;}
+    deathCheckRemaining-=delta;
+    auto target=resolveAttacker(deathCheckTargetId),actor=resolveAttacker(deathCheckActorId);
+    if(!target||!actor||field<void*>(target,0xa8)!=actor){clearDeathCheck();return;}
+    if(field<uint8_t>(target,0xb28)==10)confirmTargetDeath();
+}
 void tick(void* pawn,float delta) {
     auto combat=live()&&pawn?field<void*>(pawn,0xc90):nullptr;
     if(managed(combat)){
+        observeTargetDeath(combat,0);
         if(recoveryRemaining){
             // Native recovery timers use gameplay time, including time dilation.
             // Only an outstanding loss adds this scalar watchdog work.
@@ -723,6 +773,7 @@ void tick(void* pawn,float delta) {
     syncSession();
     combat=field<void*>(pawn,0xc90);
     if(managed(combat)){
+        observeTargetDeath(combat,delta);
         applyRecovery(combat);
         if(!playerLocked)clearTarget(combat,settings.autoLockOnHit);
         else{
@@ -868,15 +919,22 @@ void setTarget(void* combat,void* target) {
         const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
         bool temporary=false;
         auto previous=field<void*>(combat,0x1380);
-        const bool dead=!target&&previous&&playerLocked&&
-            identity(previous).address&&field<uint8_t>(previous,0xb28)==10;
+        const auto previousId=!target&&previous&&playerLocked?identity(previous):Identity{};
+        const auto previousActor=previousId.address?field<void*>(previous,0xa8):nullptr;
+        const auto previousActorId=identity(previousActor);
+        const bool dead=previousId.address&&field<uint8_t>(previous,0xb28)==10;
+        if(!dead&&previousId.address&&previousActorId.address&&settings.autoLockOnHit&&!inRequest&&lockButton!=combat){
+            clearDeathCheck();deathCheckTargetId=previousId;deathCheckActorId=previousActorId;
+            deathCheckRemaining=1.0;deathCheckIntent=lockIntent;
+            session.watched[14]=previousId.index;session.watched[15]=previousActorId.index;
+        }
         if(!dead&&!target&&playerLocked&&settings.cameraMode==1&&temporaryLoss&&temporaryLoss->combat==combat&&caller==Build::LoseLockClearReturn){
             auto previous=field<void*>(combat,0x1380);const auto id=identity(previous);
             auto actor=id.address?field<void*>(previous,0xa8):nullptr;const auto actorId=identity(actor);
             const float duration=temporaryLoss->duration;
             if(id.address&&actorId.address&&std::isfinite(duration)&&duration>0&&duration<=60){
                 clearRecovery();recoveryTargetId=id;recoveryActorId=actorId;
-                recoveryRemaining=duration+3.0;
+                recoveryRemaining=duration+3.0;recoveryDeathIntent=lockIntent;
                 rememberRecoveryLook();
                 session.watched[6]=id.index;session.watched[7]=actorId.index;temporary=true;
                 if(settings.debugLogging)++metrics.temporaryLosses;
@@ -891,7 +949,7 @@ void setTarget(void* combat,void* target) {
             if(sameCurrent(actor,trackingActorId)){
                 const auto id=trackingTargetId,actorId=trackingActorId;
                 clearRecovery();recoveryTargetId=id;recoveryActorId=actorId;
-                recoveryRemaining=3.0;recoveryReady=true;temporary=true;
+                recoveryRemaining=3.0;recoveryDeathIntent=lockIntent;recoveryReady=true;temporary=true;
                 rememberRecoveryLook();
                 session.watched[6]=id.index;session.watched[7]=actorId.index;
                 if(settings.debugLogging)++metrics.trackedClears;
@@ -908,9 +966,7 @@ void setTarget(void* combat,void* target) {
         // Losing a manual target returns to untargeted combat. Camera targeting
         // keeps the player's request and may find another enemy on its budget.
         if(dead&&settings.autoLockOnHit){
-            playerLocked=false;clearAttackPending=true;clearDeath();
-            if(settings.afterTargetDeath==0&&!attackerRemaining)deathRemaining=3.0;
-            if(settings.debugLogging)++metrics.targetDeaths;
+            confirmTargetDeath();
         }else if(!target&&!temporary&&!settings.targeting&&previous){playerLocked=false;clearAttackPending=true;}
         if(target)clearDeath();
     }

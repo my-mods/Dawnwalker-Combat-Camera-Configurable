@@ -118,8 +118,9 @@ Identity attackerPendingTargetId,attackerPendingActorId,attackerHeldTargetId,att
 double attackerRemaining{};
 bool attackerSelectionInvalidated{};
 bool attackerLookOverride{};
+AttackerGesture attackerGesture;
 void clearAttackerLook() {
-    attackerLookOverride=false;dwell.clear();pendingId={};session.watched[3]=-1;
+    attackerGesture.clear();attackerLookOverride=false;dwell.clear();pendingId={};session.watched[3]=-1;
 }
 void clearAttackerPending() {
     if(!attackerPendingTargetId.address)return;
@@ -132,7 +133,7 @@ void clearAttackerHeld() {
     attackerHeldTargetId={};attackerHeldActorId={};
     session.watched[10]=-1;session.watched[11]=-1;
 }
-void clearAttacker(){clearAttackerPending();clearAttackerHeld();}
+void clearAttacker(){clearAttackerPending();clearAttackerHeld();attackerGesture.clear();}
 // A native temporary loss is different from an ordinary target clear. Keep
 // identities through a bounded recovery window; never follow a hidden actor.
 Identity recoveryTargetId,recoveryActorId;
@@ -462,16 +463,20 @@ void viewRotation(void* camera,float delta,Vec3* view,Vec3* input) {
     }
     if(live()&&playerLocked&&
        reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase==Build::ViewRotationReturn){
-        // Observe manual look before Smooth adds its own correction. Only the
-        // current player's camera can arm an override, in all camera modes.
-        if(camera&&settings.targeting&&attackerHeldTargetId.address&&!attackerLookOverride&&
-           !attackerRemaining&&!recoveryRemaining&&view&&finite(*view)&&input&&finite(*input)&&
-           std::isfinite(delta)&&delta>0&&delta<=0.25f&&
-           (input->x!=0.0||input->y!=0.0)){
+        // Observe signed manual degrees before Smooth adds correction. Tiny
+        // samples still yield Smooth, but only a meaningful bounded gesture
+        // can release attacker priority, in every camera mode.
+        syncSession();
+        if(!view||!finite(*view)||!input||!finite(*input)||
+           !std::isfinite(delta)||delta<=0||delta>0.25f)attackerGesture.clear();
+        else if(camera&&settings.targeting&&attackerHeldTargetId.address&&!attackerLookOverride&&
+                !attackerRemaining&&!recoveryRemaining&&
+                (input->x!=0.0||input->y!=0.0||attackerGesture.active)){
             auto combat=resolve(ownerId);
             if(combat&&managed(combat)&&attackerHeldTargetId.address){
                 auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
-                if(field<void*>(pc,0x370)==camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)){
+                if(field<void*>(pc,0x370)==camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)&&
+                   attackerGesture.observe(*input,GetTickCount64())){
                     clearAttackerLook();attackerLookOverride=true;nextFallback=false;
                 }
             }
@@ -669,7 +674,7 @@ bool applyRecovery(void* combat) {
         // Native selection may assign the initial serial. The deletion watches
         // remain armed throughout; capture current serials only after success.
         const auto currentTarget=identity(target),currentActor=identity(actor);
-        clearRecovery();clearTracking();trackingTargetId=currentTarget;trackingActorId=currentActor;
+        attackerGesture.clear();clearRecovery();clearTracking();trackingTargetId=currentTarget;trackingActorId=currentActor;
         session.watched[4]=currentTarget.index;session.watched[5]=currentActor.index;
         tracking.quiet=hadLook?(now>=lastLook?(now-lastLook)*0.001:0):settings.trackingResumeMs*0.001;
         // Give the camera time to face the restored enemy before camera-directed
@@ -877,6 +882,9 @@ void setTarget(void* combat,void* target) {
                 if(settings.debugLogging)++metrics.trackedClears;
             }
         }
+        // Disappearance is a gesture boundary even when attacker identity is
+        // retained. Pre-loss aiming must not authorize a post-recovery switch.
+        if(temporary)attackerGesture.clear();
         if((target&&!recovering)||(!target&&!temporary&&field<void*>(combat,0x1380)))clearRecovery();
         if(!temporary&&reinterpret_cast<uintptr_t>(target)!=attackerHeldTargetId.address){
             if(target&&automaticRequest&&attackerLookOverride&&settings.debugLogging)++metrics.attackerOverrides;
@@ -1243,6 +1251,7 @@ void configure(Settings value) {
     if(gameThread&&GetCurrentThreadId()!=gameThread)throw std::runtime_error("Settings must be applied on the game thread");
     const bool cameraChanged=settings.cameraMode!=value.cameraMode;
     if(attackerHeldTargetId.address)clearAttackerLook();
+    else attackerGesture.clear();
     ++lockIntent;clearDeath();
     if(settings.lockLastAttacker!=value.lockLastAttacker||settings.autoLockOnHit!=value.autoLockOnHit)clearAttacker();
     settings=value;coneThreshold=value.coneDegrees?std::max(Build::nativeCone,std::cos(value.coneDegrees*3.14159265358979323846/180.0)):Build::nativeCone;

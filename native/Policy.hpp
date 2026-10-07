@@ -73,6 +73,25 @@ struct Tracking {
         return correction;
     }
 };
+// RotationInput contains per-update pitch/yaw degrees, not angular velocity.
+// Sum signed manual displacement only: jitter cancels and slow drift cannot
+// accumulate forever. Smooth yielding deliberately does not use this gate.
+struct AttackerGesture {
+    static constexpr double minimumDegrees=3.0;
+    static constexpr uint64_t windowMs=250,quietMs=100;
+    double pitch{},yaw{};
+    uint64_t first{},last{};
+    bool active{};
+    void clear(){*this={};}
+    bool observe(Vec3 input,uint64_t now) {
+        if(!finite(input)){clear();return false;}
+        if(active&&(now<last||now-first>windowMs||now-last>quietMs))clear();
+        if(input.x==0.0&&input.y==0.0)return false;
+        if(!active){active=true;first=now;}
+        last=now;pitch+=input.x;yaw+=input.y;
+        return std::hypot(pitch,yaw)>=minimumDegrees;
+    }
+};
 // Opaque identity values only; ownership changes never bypass the hard budget.
 struct RequestBudget {
     uint64_t last{}; bool used{};

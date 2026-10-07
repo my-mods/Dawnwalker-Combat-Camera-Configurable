@@ -17,7 +17,7 @@ Camera behavior is independent of target selection. Smooth and Native tracking r
 [*][b][color=#A8D5C2]Scripted ability cameras:[/color][/b] Moves such as Voracious Bite use their normal camera. Automatic camera-directed target switching pauses until the scripted view has finished blending out.
 [*][b][color=#A8D5C2]Disappearing enemies:[/color][/b] Smooth tracking briefly remembers a disappearing tracked enemy and retries recovery if it reappears late, including behind the camera. Recovery keeps native range and visibility checks and works with both targeting styles. Unlocking cancels it; mouse and right-stick movement still take priority.
 [*][b][color=#A8D5C2]Three targeting modes:[/color][/b] Select enemies by aiming the camera, keep one enemy selected, or fight with no target selected at all.
-[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] An optional toggle, Off by default. While already locked on, switch to the last enemy whose attack hits you, including blocks and parries. With Camera-directed targeting On, move the camera toward another enemy and hold aim for Target switch delay to override the attacker. With it Off, hold that enemy until another attacker hits you, you unlock or the target is lost. Works with Free, Smooth and Native camera behavior.
+[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] An optional toggle, Off by default. While already locked on, switch to the last enemy whose attack hits you, including blocks and parries. With Camera-directed targeting On, deliberately turn the camera toward another enemy and hold aim for Target switch delay to override the attacker. Tiny camera inputs keep the attacker selected. With it Off, hold that enemy until another attacker hits you, you unlock or the target is lost. Works with Free, Smooth and Native camera behavior.
 [*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire an incoming attacker even while unlocked, including blocks and parries. Keep Smooth tracking or your other chosen camera behavior. After the target dies, select the nearest eligible enemy by default, or wait for the next hit. Manual unlock cancels pending requests; a later hit can lock again.
 [*][b][color=#A8D5C2]Aim unlocked attacks:[/color][/b] Attack toward the camera's horizontal aim even when the character faces elsewhere. Blocking still requires the correct incoming attack direction, without needing that enemy selected.
 [*][b][color=#A8D5C2]Optional center dot:[/color][/b] Choose Off, Weapon drawn, or Always in gameplay. Off is the default. The dot uses the game's HUD and hides during menus, cinematics and loading.
@@ -84,7 +84,7 @@ Press [b]R3 / right-stick click[/b], or your configured keyboard/controller [b]t
 [/list]
 Both locked modes keep their target-based attack direction. Moving the right stick or mouse controls the camera and does not cycle a fixed target. Changing camera or targeting settings preserves your current lock state. Leaving combat or loading a new player starts untargeted.
 
-Camera-directed searches run only while target lock and Camera-directed targeting are both on, and pause while a last attacker has priority until you move the camera to choose another enemy.
+Camera-directed searches run only while target lock and Camera-directed targeting are both on, and pause while a last attacker has priority until you deliberately turn the camera to choose another enemy.
 
 [size=4][b][color=#E8C88A]Credits and source[/color][/b][/size]
 

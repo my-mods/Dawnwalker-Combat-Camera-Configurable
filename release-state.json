@@ -73,9 +73,9 @@
       ],
       "pending": {
         "impact": "minor",
-        "rationale": "Complete direct Nexus 3.4.2 delta reviewed: compatible five-level Logging/migration/native ABI, meaningful attacker gesture, corrected scripted-camera component ownership, bounded state-based death confirmation, and direct validated native target-death notification so handoff does not require observable Dead. Keeps native cleanup, manual/Apply/lifetime cancellation, all camera modes, next-hit choice and shared 50ms/two-pass budgets. Logging is the compatible minor addition; death changes are corrective. Player documents updated. No breaking settings; keep 3.5.0-dev. New no-state regression fails without event handling and 98 callback scenarios plus prior native suites pass; live retest remains. Release preparation: include the completed 2026-10-08 death-callback correction with the unchanged review message; final version-bearing native rebuild and exact ZIP verification.",
+        "rationale": "Complete direct Nexus 3.4.2 delta reviewed: compatible five-level Logging/migration/native ABI, meaningful attacker gesture, corrected scripted-camera component ownership, bounded state-based death confirmation, and direct validated native target-death notification so handoff does not require observable Dead. Keeps native cleanup, manual/Apply/lifetime cancellation, all camera modes, next-hit choice and shared 50ms/two-pass budgets. Logging is the compatible minor addition; death changes are corrective. Player documents updated. No breaking settings; keep 3.5.0-dev. New no-state regression fails without event handling and 98 callback scenarios plus prior native suites pass; live retest remains. Release preparation: verified unchanged live Nexus baseline on 2026-10-08; consolidated complete player changelog and preserved published page formatting/history.",
         "majorOverride": false,
-        "reviewedInputs": "2fbccda3ccfeb7e4edf68faacfd62a97dfdad9c300d56f48fad28a843f1405fe",
+        "reviewedInputs": "d42bac84e45f7716c4d0e37a0c65665bdafd3f2c382f6cea345bd71d469012b9",
         "divergenceReviewed": false
       }
     }

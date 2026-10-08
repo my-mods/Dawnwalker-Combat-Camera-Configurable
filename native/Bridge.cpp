@@ -58,7 +58,7 @@ DWORD gameThread{};
 bool attempted{};
 bool inputSupported{true};
 std::wstring startError;
-std::array<void*,35> hooked{};size_t hookCount{};
+std::array<void*,37> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -120,6 +120,11 @@ void clearDeathCheck(){
     session.watched[14]=-1;session.watched[15]=-1;
 }
 void clearDeath(){deathRemaining=0;deathFallback=false;clearDeathCheck();}
+// Only the native current-target OnDeath delegate establishes this scope.
+// Borrowed delegate storage is never retained; identities and intent bind a
+// nested clear to the target selected when the death notification began.
+struct DeathNotification {Identity owner,target,actor;uint64_t intent{};};
+thread_local const DeathNotification* deathNotification{};
 bool clearAttackPending{true};
 // Hit callbacks retain only indexed identities. The existing player tick makes
 // one bounded selection attempt after the native hit reaction has completed.
@@ -370,7 +375,7 @@ struct Metrics {
     uint64_t trackingAttempts{},trackingSteps{},trackingMoves{},trackingInput{},trackingMicros{};
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{},trackedClears{},recoveryAttempts{},recoveryMicros{};
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
-    uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{};
+    uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{},deathEvents{},deathEventClears{};
     uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{},abilityTraceSuppressed{},abilityViewsPrevented{};
     uint64_t since{};
 } metrics;
@@ -414,6 +419,7 @@ void report(uint64_t now) {
         L" autoLocks="+std::to_wstring(metrics.autoLocks)+L" targetDeaths="+std::to_wstring(metrics.targetDeaths)+
         L" deathSearches="+std::to_wstring(metrics.deathSearches)+L" deathSwitches="+std::to_wstring(metrics.deathSwitches)+
         L" deathMisses="+std::to_wstring(metrics.deathMisses)+L" deathUs="+std::to_wstring(metrics.deathMicros)+
+        L" deathEvents="+std::to_wstring(metrics.deathEvents)+L" deathEventClears="+std::to_wstring(metrics.deathEventClears)+
         L" selectionUs="+std::to_wstring(metrics.micros)+L"\n";
     RC::Output::send(message);metrics={};metrics.since=now;
 }
@@ -922,7 +928,11 @@ void setTarget(void* combat,void* target) {
         const auto previousId=!target&&previous&&playerLocked?identity(previous):Identity{};
         const auto previousActor=previousId.address?field<void*>(previous,0xa8):nullptr;
         const auto previousActorId=identity(previousActor);
-        const bool dead=previousId.address&&field<uint8_t>(previous,0xb28)==10;
+        const bool notified=deathNotification&&deathNotification->owner==ownerId&&
+            deathNotification->intent==lockIntent&&deathNotification->target==previousId&&
+            deathNotification->actor==previousActorId&&previousId.address&&previousActorId.address;
+        const bool dead=previousId.address&&(notified||field<uint8_t>(previous,0xb28)==10);
+        if(notified&&settings.debugLogging)++metrics.deathEventClears;
         if(!dead&&previousId.address&&previousActorId.address&&settings.autoLockOnHit&&!inRequest&&lockButton!=combat){
             clearDeathCheck();deathCheckTargetId=previousId;deathCheckActorId=previousActorId;
             deathCheckRemaining=1.0;deathCheckIntent=lockIntent;
@@ -972,6 +982,37 @@ void setTarget(void* combat,void* target) {
     }
     originalSetTarget(combat,target);
     if(local){if(!target)clearTracking();managed(combat,true);}
+}
+// The game's OnDeath binding installs these two raw-delegate executors on
+// the selected target. Native clear cleanup runs unchanged inside the scope.
+using DeathExecute=void(*)(void*);
+using DeathExecuteSafe=bool(*)(void*);
+DeathExecute originalDeathExecute{};
+DeathExecuteSafe originalDeathExecuteSafe{};
+struct DeathScope {
+    DeathNotification event{};
+    const DeathNotification* previous{deathNotification};
+    explicit DeathScope(void* delegate) {
+        // Worker/inactive calls and disabled acquisition perform no object reads.
+        if(!live()||!settings.autoLockOnHit||!delegate||
+           field<void*>(delegate,0)!=at<void*>(Build::TargetDeathDelegateVtable))return;
+        syncSession();
+        auto combat=field<void*>(delegate,0x18);
+        if(!identity(combat).address||!managed(combat,true)||!playerLocked)return;
+        const auto target=field<void*>(combat,0x1380);const auto targetId=identity(target);
+        auto actor=targetId.address?field<void*>(target,0xa8):nullptr;
+        const auto actorId=identity(actor);
+        if(!targetId.address||!actorId.address||actor==field<void*>(combat,0xa8))return;
+        event={ownerId,targetId,actorId,lockIntent};deathNotification=&event;
+        if(settings.debugLogging)++metrics.deathEvents;
+    }
+    ~DeathScope(){deathNotification=previous;}
+};
+void deathExecute(void* delegate) {
+    const DeathScope scope{delegate};originalDeathExecute(delegate);
+}
+bool deathExecuteSafe(void* delegate) {
+    const DeathScope scope{delegate};return originalDeathExecuteSafe(delegate);
 }
 void* abilityPlayer(void* pawn) {
     if(!live()||!pawn)return nullptr;
@@ -1378,6 +1419,12 @@ bool start(std::wstring& error) {
             effectCameraSupported=false;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Scripted effect-camera handoff unavailable: "+std::wstring(reason.begin(),reason.end())+L". Synchronised-action protection and other features remain available.\n");
         }
+        bool deathEventsSupported=true;
+        try{NativeCompatibility::validateContract(moduleBase,Build::targetDeathCode,Build::targetDeathPointers);}
+        catch(const std::exception& failure){
+            deathEventsSupported=false;const std::string reason=failure.what();
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Target-death notification unavailable: "+std::wstring(reason.begin(),reason.end())+L". State-based death detection and other features remain available.\n");
+        }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's validated FName constructor. Store only value IDs; resolve
         // input action names once on the game thread at startup.
@@ -1403,6 +1450,10 @@ bool start(std::wstring& error) {
         }
         if(focusViewSupported)hook(Build::BlendView,&blendView,originalBlendView);
         if(effectCameraSupported)hook(Build::EffectStart,&effectStart,originalEffectStart);
+        if(deathEventsSupported){
+            hook(Build::TargetDeathExecute,&deathExecute,originalDeathExecute);
+            hook(Build::TargetDeathExecuteSafe,&deathExecuteSafe,originalDeathExecuteSafe);
+        }
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
         hook(Build::QuerySetting,&querySetting,originalSettingQuery);

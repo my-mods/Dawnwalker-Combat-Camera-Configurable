@@ -3,6 +3,18 @@
 #pragma once
 #include "CodeCompatibility.hpp"
 namespace CombatCamera::Build {
+// Current-target OnDeath binding, native cleanup and raw delegate executors.
+// SetTarget's +440 subscription is covered by the core contract below.
+inline constexpr std::array<NativeCompatibility::Code,4> targetDeathCode{{
+{0x5e0b20c,264,"67d521a7c24622e25dc43bcfeb209262ad43688ee4412e7ce987c2bea6e78204"},
+{0x5e0e574,81,"0172b92a51fc04573f32bf514573080c37444d992bc738a9fcae1866bffe5011"},
+{0x5e105b4,11,"5ab6867469e0d4225c4ed9fc44f6526b78bb0b971e845541f0b97bb2e13bb234"},
+{0x5e10650,22,"6ee2650bf9778f4dbbe7c833a5ef3748137d12eb28480db182977fbda4f0dc9c"},
+}};
+inline constexpr std::array<NativeCompatibility::Pointer,2> targetDeathPointers{{
+{0x8afec18,0x5e105b4},
+{0x8afec20,0x5e10650},
+}};
 // Native effect-camera activation, stack ownership and blend lifetime.
 inline constexpr std::array<NativeCompatibility::Code,13> effectCameraCode{{
 // Player +c58 construction, component identity/owner and native stack consumer.

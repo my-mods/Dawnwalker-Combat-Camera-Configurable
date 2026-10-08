@@ -1,143 +1,137 @@
 [size=5][b][color=#E8C88A]Combat Camera - Configurable[/color][/b][/size]
-
-Choose a free camera, gentle target following or native tracking. Fight without a target, let your aim choose an enemy, or keep one enemy selected. Use your normal target-lock button to enter or leave targeting, and choose the locked behavior in Mod Setting Menu. Settings persist across save loads and game launches.
-
-[size=4][b][color=#E8C88A]New camera tracking system[/color][/b][/size]
-
-[list=1]
-[*][b][color=#A8D5C2]Free Camera:[/color][/b] Move the camera yourself, with no automatic enemy tracking. This is the default.
-[*][b][color=#A8D5C2]Smooth Tracking Camera:[/color][/b] Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength, and Tracking catch-up for faster turns when the enemy moves far from your camera's aim.
-[*][b][color=#A8D5C2]Native Tracking Camera:[/color][/b] Use the game's normal target tracking speed.
-[/list]
-Camera behavior is independent of target selection. Smooth and Native tracking require an active target lock and work with both camera-directed targeting and fixed enemy selection.
-
-[size=4][b][color=#E8C88A]Features[/color][/b][/size]
-
-[list]
-[*][b][color=#A8D5C2]Scripted ability cameras:[/color][/b] Moves such as Voracious Bite use their normal camera. Automatic camera-directed target switching pauses until the scripted view has finished blending out.
-[*][b][color=#A8D5C2]Disappearing enemies:[/color][/b] Smooth tracking briefly remembers a disappearing tracked enemy and retries recovery if it reappears late, including behind the camera. Recovery keeps native range and visibility checks and works with both targeting styles. Unlocking cancels it; mouse and right-stick movement still take priority.
-[*][b][color=#A8D5C2]Three targeting modes:[/color][/b] Select enemies by aiming the camera, keep one enemy selected, or fight with no target selected at all.
-[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] An optional toggle, Off by default. While already locked on, switch to the last enemy whose attack hits you, including blocks and parries. With Camera-directed targeting On, deliberately turn the camera toward another enemy and hold aim for Target switch delay to override the attacker. Tiny camera inputs keep the attacker selected. With it Off, hold that enemy until another attacker hits you, you unlock or the target is lost. Works with Free, Smooth and Native camera behavior.
-[*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire an incoming attacker even while unlocked, including blocks and parries. Keep Smooth tracking or your other chosen camera behavior. After the target dies, select the nearest eligible enemy by default, or wait for the next hit. Manual unlock cancels pending requests; a later hit can lock again.
-[*][b][color=#A8D5C2]Aim unlocked attacks:[/color][/b] Attack toward the camera's horizontal aim even when the character faces elsewhere. Blocking still requires the correct incoming attack direction, without needing that enemy selected.
-[*][b][color=#A8D5C2]Optional center dot:[/color][/b] Choose Off, Weapon drawn, or Always in gameplay. Off is the default. The dot uses the game's HUD and hides during menus, cinematics and loading.
-[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] Reduce right-stick camera sensitivity near your target during camera-directed targeting, with adjustable strength. Fixed-target and untargeted modes keep full sensitivity. It does not steer the camera, and mouse movement is excluded.
-[*][b][color=#A8D5C2]Saved settings:[/color][/b] Choose camera behavior, tracking speed, resume delay, targeting behavior, center dot and slowdown in Mod Setting Menu. Preferences are restored on the next launch.
-[/list]
-[size=4][b][color=#E8C88A]Installation[/color][/b][/size]
-
-[list]
-[*][b][color=#A8D5C2]Vortex:[/color][/b] Install Combat-Camera-Configurable.zip through Vortex, enable it and deploy.
-[*][b][color=#A8D5C2]Manual:[/color][/b] Copy the archive's Data/CombatCamera folder into The Blood of Dawnwalker/Dawnwalker/Binaries/Win64/ue4ss/Mods, preserving the folder structure.
-[/list]
-
-[size=4][b][color=#E8C88A]Reporting Bugs and other issues[/color][/b][/size]
-
-If you encounter an issue, set [b]Logging[/b] to [b]Debug[/b] in this mod’s Mod Setting Menu settings, apply the change, reproduce the issue. Then start either a bug report in the Bugs tab on Nexus (preferred method for me to track things), or at least start a new thread in comments and send me [b]Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log[/b] from your game folder. Do not report unrelated bugs in other people's threads, please, this makes it impossible for me to track issues.
-
-[size=4][b][color=#E8C88A]Configuration[/color][/b][/size]
-
-Open Mod Settings, select [b]Combat Camera - Configurable[/b] and adjust the controls.
-
-[b][color=#E8C88A]General[/color][/b]
-[list]
-[*][b][color=#A8D5C2]Enable mod:[/color][/b] On by default.
-[*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.
-[/list]
-
-[b][color=#E8C88A]Camera[/color][/b]
-[list]
-[*][b][color=#A8D5C2]Camera behavior:[/color][/b] Free by default. Smooth tracking gently follows a locked enemy; Native tracking uses the game's normal tracking speed.
-[*][b][color=#A8D5C2]Tracking speed:[/color][/b] 50% by default, adjustable from 10% to 100% in 5% steps. Shown only for Smooth tracking. Controls automatic following independently of controller aim slowdown.
-[*][b][color=#A8D5C2]Tracking catch-up:[/color][/b] Up to 3x by default; choose Off or a maximum of 2x to 5x. Smooth tracking turns faster as the target moves farther from camera aim, increasing the boost from 45 to 180 degrees and easing back to normal near the target. Manual camera input still takes priority.
-[*][b][color=#A8D5C2]Tracking resume delay:[/color][/b] 750 ms (0.75 seconds) by default, adjustable from 0 to 3000 ms in 50 ms steps. Shown only for Smooth tracking. Manual camera movement pauses tracking, which then eases back in after this delay. With Camera-directed targeting On, keep this longer than Target switch delay and allow extra time for target selection so tracking does not pull you away before switching.
-[/list]
-
-[b][color=#E8C88A]Targeting[/color][/b]
-[list]
-[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On selects enemies toward the camera while locked. Off retains your chosen enemy. Both choices work with all three camera behaviors.
-[*][b][color=#A8D5C2]Targeting cone:[/color][/b] 45° from the camera axis by default; adjustable from 1° to 90°. Set 0 to use the native cone.
-[*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.
-[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority after a hit; deliberate camera aiming can override it when Camera-directed targeting is On. Hits while unlocked only turn target lock on when Automatic lock on hit is enabled. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.
-[*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire and switch to enemies whose attacks hit you, including blocks and parries. Works independently of Lock to last attacker.
-[*][b][color=#A8D5C2]After target death:[/color][/b] Nearest enemy by default, or Wait for next hit. Applies when Automatic lock on hit is On. If no eligible enemy is in native range, remain unlocked until another hit or manual lock.
-[/list]
-
-[b][color=#E8C88A]Controller[/color][/b]
-[list]
-[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] On by default.
-[*][b][color=#A8D5C2]Slowdown strength:[/color][/b] 35% by default; adjustable from 0% to 80%.
-[/list]
-
-[b][color=#E8C88A]Diagnostics[/color][/b]
-[list]
-[*][b][color=#A8D5C2]Logging:[/color][/b] Off by default. When enabled, writes diagnostic events and aggregate summaries to Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log.
-[/list]
-[size=4][b][color=#E8C88A]Targeting behavior[/color][/b][/size]
-
-Press [b]R3 / right-stick click[/b], or your configured keyboard/controller [b]target-lock[/b] binding, to enter or leave targeting. Camera behavior is independent of these targeting states:
-
-[list=1]
-[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] Target lock On, Camera-directed targeting On. Aim the camera toward an enemy to select them. Adjust the targeting cone and switch delay to control how selection responds.
-[*][b][color=#A8D5C2]Fixed enemy selection:[/color][/b] Target lock On, Camera-directed targeting Off. Keep your chosen enemy selected. Smooth tracking temporarily yields when you look around. To choose someone else, unlock, aim toward the new enemy and lock again.
-[*][b][color=#A8D5C2]Untargeted combat:[/color][/b] Target lock Off, with either targeting setting. Attack in the direction your camera is facing. Self-centered abilities cast without selecting an enemy; abilities that need a primary target use an enemy under your current camera aim without enabling target lock. Spells that need an enemy will not cast if no valid target is available. Using abilities while unlocked keeps your current camera framing.
-[/list]
-Both locked modes keep their target-based attack direction. Moving the right stick or mouse controls the camera and does not cycle a fixed target. Changing camera or targeting settings preserves your current lock state. Leaving combat or loading a new player starts untargeted.
-
-Camera-directed searches run only while target lock and Camera-directed targeting are both on, and pause while a last attacker has priority until you deliberately turn the camera to choose another enemy.
-
-[size=4][b][color=#E8C88A]Credits and source[/color][/b][/size]
-
-Inspired by [url=https://www.nexusmods.com/thebloodofdawnwalker/mods/340]Free Combat Camera – Camera Directed Targeting[/url] by xxxxxMIKxxxxx. [b]This is an independent implementation: no code from the original mod was copied or reused.[/b] The original mod is not required, and its DLL, configuration and bootstrap are not included.
-
-Thanks to the UE4SS contributors, Vercadi, mmarcussa for Mod Setting Menu, and Tsuda Kageyu and contributors for MinHook.
-
-[url=https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable]Source code and license[/url]
-
-[size=5][b][color=#E8C88A]My Dawnwalker mods[/color][/b][/size]
-
-[size=4][b][color=#E8C88A]Combat your way[/color][/b][/size]
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/161]Easier Parry and Dodge While Blocking[/url][/color][/b]
-Make parry and perfect-dodge windows longer or shorter to suit your timing.
-[b]Highlights:[/b] Consistent same-side or opposite-side ripostes; dodge while blocking; adjustable dodge invulnerability duration.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/480]Combat Camera - Configurable[/url][/color][/b]
-Choose how your camera follows enemies and how you select your targets.
-[b]Highlights:[/b] Free, smooth or native tracking; camera-directed or fixed targets; automatic lock on hit; optional center dot.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/284]Fair Duelist - Customizable Difficulty[/url][/color][/b]
-Build your own difficulty with precise control over combat balance.
-[b]Highlights:[/b] Enemy health and damage; stamina costs; normal, low-health and ranged attack delays; coordinated enemy attacks.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/448]Health Regen - Configurable[/url][/color][/b]
-Set separate health regeneration rates for your human and vampire forms.
-[b]Highlights:[/b] Optional healing during combat; optional recovery of lost vampire segments; healing stops at the selected limit.
-
-[size=4][b][color=#E8C88A]Controls and exploration[/color][/b][/size]
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/203]Controller Tweaks and Remap[/url][/color][/b]
-Tailor your controller layout and make walking and menu access more comfortable.
-[b]Highlights:[/b] 31 controller settings; wider walking range; short press for Map, long press for Game Hub; controller stutter fixes.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/449]Press to Gather - Configurable[/url][/color][/b]
-Gather nearby harvestable resources with one keyboard press or controller hold.
-[b]Highlights:[/b] Adjustable 10–200 m range; 14 controller button choices; support for 17 additional wild plant types.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/711]Less Wildlife[/url][/color][/b]
-Make ordinary boar herds and wolf packs smaller—or larger.
-[b]Highlights:[/b] Population from 10% to 200%; separate boar and wolf switches; quest and named animals keep their normal values.
-
-[size=4][b][color=#E8C88A]Your view, your style[/color][/b][/size]
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/452]Quiet Dawn - Configurable HUD[/url][/color][/b]
-Clear the screen while keeping health and stamina alerts when you need them.
-[b]Highlights:[/b] 17 panels with independent opacity and size; hold-to-peek; configurable combat cues, enemy information and effect icons.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/721]Style Without Sacrifice - Your Transmogrification Wardrobe[/url][/color][/b]
-Choose your equipment's appearance while keeping its stats.
-[b]Highlights:[/b] Separate day and night outfits; three saved presets; character preview; hide selected equipment; collected or all looks.
-
-[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/694]Night Vision - Configurable[/url][/color][/b]
-See in the dark as a vampire with natural colours or your preferred monochrome blend.
-[b]Highlights:[/b] Independent brightness and colour controls; keyboard or controller toggle; stays enabled through save loading and camera changes.
+<br />
+<br />Choose a free camera, gentle target following or native tracking. Fight without a target, let your aim choose an enemy, or keep one enemy selected. Use your normal target-lock button to enter or leave targeting, and choose the locked behavior in Mod Setting Menu. Settings persist across save loads and game launches.
+<br />
+<br />[size=4][b][color=#E8C88A]New camera tracking system[/color][/b][/size]
+<br />
+<br />[list=1]
+<br />[*][b][color=#A8D5C2]Free Camera:[/color][/b] Move the camera yourself, with no automatic enemy tracking. This is the default.[/*]
+<br />[*][b][color=#A8D5C2]Smooth Tracking Camera:[/color][/b] Gently follow your locked enemy horizontally and vertically. Move the mouse or right stick at any time to take control; tracking resumes after an adjustable pause. Adjust Tracking speed to set its strength, and Tracking catch-up for faster turns when the enemy moves far from your camera's aim.[/*]
+<br />[*][b][color=#A8D5C2]Native Tracking Camera:[/color][/b] Use the game's normal target tracking speed.[/*]
+<br />[/list]Camera behavior is independent of target selection. Smooth and Native tracking require an active target lock and work with both camera-directed targeting and fixed enemy selection.
+<br />
+<br />[size=4][b][color=#E8C88A]Features[/color][/b][/size]
+<br />
+<br />[list]
+<br />[*][b][color=#A8D5C2]Targeting recovery:[/color][/b] Nearest-enemy selection recovers after a kill even when the lock clears early. Tiny camera inputs keep last-attacker priority; deliberate aiming can still choose another enemy. Tracking resumes after scripted camera sequences.[/*]
+<br />[*][b][color=#A8D5C2]Scripted ability cameras:[/color][/b] Moves such as Voracious Bite use their normal camera. Automatic camera-directed target switching pauses until the scripted view has finished blending out.[/*]
+<br />[*][b][color=#A8D5C2]Disappearing enemies:[/color][/b] Smooth tracking briefly remembers a disappearing tracked enemy and retries recovery if it reappears late, including behind the camera. Recovery keeps native range and visibility checks and works with both targeting styles. Unlocking cancels it; mouse and right-stick movement still take priority.[/*]
+<br />[*][b][color=#A8D5C2]Three targeting modes:[/color][/b] Select enemies by aiming the camera, keep one enemy selected, or fight with no target selected at all.[/*]
+<br />[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] An optional toggle, Off by default. While already locked on, switch to the last enemy whose attack hits you, including blocks and parries. With Camera-directed targeting On, move the camera toward another enemy and hold aim for Target switch delay to override the attacker. With it Off, hold that enemy until another attacker hits you, you unlock or the target is lost. Works with Free, Smooth and Native camera behavior.[/*]
+<br />[*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire an incoming attacker even while unlocked, including blocks and parries. Keep Smooth tracking or your other chosen camera behavior. After the target dies, select the nearest eligible enemy by default, or wait for the next hit. Manual unlock cancels pending requests; a later hit can lock again.[/*]
+<br />[*][b][color=#A8D5C2]Aim unlocked attacks:[/color][/b] Attack toward the camera's horizontal aim even when the character faces elsewhere. Blocking still requires the correct incoming attack direction, without needing that enemy selected.[/*]
+<br />[*][b][color=#A8D5C2]Optional center dot:[/color][/b] Choose Off, Weapon drawn, or Always in gameplay. Off is the default. The dot uses the game's HUD and hides during menus, cinematics and loading.[/*]
+<br />[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] Reduce right-stick camera sensitivity near your target during camera-directed targeting, with adjustable strength. Fixed-target and untargeted modes keep full sensitivity. It does not steer the camera, and mouse movement is excluded.[/*]
+<br />[*][b][color=#A8D5C2]Saved settings:[/color][/b] Choose camera behavior, tracking speed, resume delay, targeting behavior, center dot and slowdown in Mod Setting Menu. Preferences are restored on the next launch.[/*]
+<br />[/list][size=4][b][color=#E8C88A]Installation[/color][/b][/size]
+<br />
+<br />[list]
+<br />[*][b][color=#A8D5C2]Vortex:[/color][/b] Install Combat-Camera-Configurable.zip through Vortex, enable it and deploy.[/*]
+<br />[*][b][color=#A8D5C2]Manual:[/color][/b] Copy the archive's Data/CombatCamera folder into The Blood of Dawnwalker/Dawnwalker/Binaries/Win64/ue4ss/Mods, preserving the folder structure.[/*]
+<br />[/list]
+<br />[size=4][b][color=#E8C88A]Reporting Bugs and other issues[/color][/b][/size]
+<br />
+<br />If you encounter an issue, set [b]Logging[/b] to [b]Debug[/b] in this mod’s Mod Setting Menu settings, apply the change, reproduce the issue. Then start either a bug report in the Bugs tab on Nexus (preferred method for me to track things), or at least start a new thread in comments and send me [b]Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log[/b] from your game folder. Do not report unrelated bugs in other people's threads, please, this makes it impossible for me to track issues.
+<br />
+<br />
+<br />[size=4][b][color=#E8C88A]Configuration[/color][/b][/size]
+<br />
+<br />Open Mod Settings, select [b]Combat Camera - Configurable[/b] and adjust the controls.
+<br />
+<br />[b][color=#E8C88A]General[/color][/b]
+<br />[list]
+<br />[*][b][color=#A8D5C2]Enable mod:[/color][/b] On by default.[/*]
+<br />[*][b][color=#A8D5C2]Center dot:[/color][/b] Off by default. Other choices are Weapon drawn and Always in gameplay.[/*]
+<br />[/list]
+<br />[b][color=#E8C88A]Camera[/color][/b]
+<br />[list]
+<br />[*][b][color=#A8D5C2]Camera behavior:[/color][/b] Free by default. Smooth tracking gently follows a locked enemy; Native tracking uses the game's normal tracking speed.[/*]
+<br />[*][b][color=#A8D5C2]Tracking speed:[/color][/b] 50% by default, adjustable from 10% to 100% in 5% steps. Shown only for Smooth tracking. Controls automatic following independently of controller aim slowdown.[/*]
+<br />[*][b][color=#A8D5C2]Tracking catch-up:[/color][/b] Up to 3x by default; choose Off or a maximum of 2x to 5x. Smooth tracking turns faster as the target moves farther from camera aim, increasing the boost from 45 to 180 degrees and easing back to normal near the target. Manual camera input still takes priority.[/*]
+<br />[*][b][color=#A8D5C2]Tracking resume delay:[/color][/b] 750 ms (0.75 seconds) by default, adjustable from 0 to 3000 ms in 50 ms steps. Shown only for Smooth tracking. Manual camera movement pauses tracking, which then eases back in after this delay. With Camera-directed targeting On, keep this longer than Target switch delay and allow extra time for target selection so tracking does not pull you away before switching.[/*]
+<br />[/list]
+<br />[b][color=#E8C88A]Targeting[/color][/b]
+<br />[list]
+<br />[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] On selects enemies toward the camera while locked. Off retains your chosen enemy. Both choices work with all three camera behaviors.[/*]
+<br />[*][b][color=#A8D5C2]Targeting cone:[/color][/b] 45° from the camera axis by default; adjustable from 1° to 90°. Set 0 to use the native cone.[/*]
+<br />[*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.[/*]
+<br />[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority after a hit; deliberate camera aiming can override it when Camera-directed targeting is On. Hits while unlocked only turn target lock on when Automatic lock on hit is enabled. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.[/*]
+<br />[*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire and switch to enemies whose attacks hit you, including blocks and parries. Works independently of Lock to last attacker.[/*]
+<br />[*][b][color=#A8D5C2]After target death:[/color][/b] Nearest enemy by default, or Wait for next hit. Applies when Automatic lock on hit is On. If no eligible enemy is in native range, remain unlocked until another hit or manual lock.[/*]
+<br />[/list]
+<br />[b][color=#E8C88A]Controller[/color][/b]
+<br />[list]
+<br />[*][b][color=#A8D5C2]Controller aim slowdown:[/color][/b] On by default.[/*]
+<br />[*][b][color=#A8D5C2]Slowdown strength:[/color][/b] 35% by default; adjustable from 0% to 80%.[/*]
+<br />[/list]
+<br />[b][color=#E8C88A]Diagnostics[/color][/b]
+<br />[list]
+<br />[*][b][color=#A8D5C2]Logging:[/color][/b] Choose Off, Error, Warning, Info or Debug. Warning is the default; Off is silent. Debug records detailed troubleshooting information in Dawnwalker/Binaries/Win64/ue4ss/UE4SS.log.[/*]
+<br />[/list][size=4][b][color=#E8C88A]Targeting behavior[/color][/b][/size]
+<br />
+<br />Press [b]R3 / right-stick click[/b], or your configured keyboard/controller [b]target-lock[/b] binding, to enter or leave targeting. Camera behavior is independent of these targeting states:
+<br />
+<br />[list=1]
+<br />[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] Target lock On, Camera-directed targeting On. Aim the camera toward an enemy to select them. Adjust the targeting cone and switch delay to control how selection responds.[/*]
+<br />[*][b][color=#A8D5C2]Fixed enemy selection:[/color][/b] Target lock On, Camera-directed targeting Off. Keep your chosen enemy selected. Smooth tracking temporarily yields when you look around. To choose someone else, unlock, aim toward the new enemy and lock again.[/*]
+<br />[*][b][color=#A8D5C2]Untargeted combat:[/color][/b] Target lock Off, with either targeting setting. Attack in the direction your camera is facing. Self-centered abilities cast without selecting an enemy; abilities that need a primary target use an enemy under your current camera aim without enabling target lock. Spells that need an enemy will not cast if no valid target is available. Using abilities while unlocked keeps your current camera framing.[/*]
+<br />[/list]Both locked modes keep their target-based attack direction. Moving the right stick or mouse controls the camera and does not cycle a fixed target. Changing camera or targeting settings preserves your current lock state. Leaving combat or loading a new player starts untargeted.
+<br />
+<br />Camera-directed searches run only while target lock and Camera-directed targeting are both on, and pause while a last attacker has priority until you move the camera to choose another enemy.
+<br />
+<br />[size=4][b][color=#E8C88A]Credits and source[/color][/b][/size]
+<br />
+<br />Inspired by [url=https://www.nexusmods.com/thebloodofdawnwalker/mods/340]Free Combat Camera – Camera Directed Targeting[/url] by xxxxxMIKxxxxx. [b]This is an independent implementation: no code from the original mod was copied or reused.[/b] The original mod is not required, and its DLL, configuration and bootstrap are not included.
+<br />
+<br />Thanks to the UE4SS contributors, Vercadi, mmarcussa for Mod Setting Menu, and Tsuda Kageyu and contributors for MinHook.
+<br />
+<br />[url=https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable]Source code and license[/url]
+<br />
+<br />[size=5][b][color=#E8C88A]My Dawnwalker mods[/color][/b][/size]
+<br />
+<br />[size=4][b][color=#E8C88A]Combat your way[/color][/b][/size]
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/161]Easier Parry and Dodge While Blocking[/url][/color][/b]
+<br />Make parry and perfect-dodge windows longer or shorter to suit your timing.
+<br />[b]Highlights:[/b] Consistent same-side or opposite-side ripostes; dodge while blocking; adjustable dodge invulnerability duration.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/480]Combat Camera - Configurable[/url][/color][/b]
+<br />Choose how your camera follows enemies and how you select your targets.
+<br />[b]Highlights:[/b] Free, smooth or native tracking; camera-directed or fixed targets; automatic lock on hit; optional center dot.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/284]Fair Duelist - Customizable Difficulty[/url][/color][/b]
+<br />Build your own difficulty with precise control over combat balance.
+<br />[b]Highlights:[/b] Enemy health and damage; stamina costs; normal, low-health and ranged attack delays; coordinated enemy attacks.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/448]Health Regen - Configurable[/url][/color][/b]
+<br />Set separate health regeneration rates for your human and vampire forms.
+<br />[b]Highlights:[/b] Optional healing during combat; optional recovery of lost vampire segments; healing stops at the selected limit.
+<br />
+<br />[size=4][b][color=#E8C88A]Controls and exploration[/color][/b][/size]
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/203]Controller Tweaks and Remap[/url][/color][/b]
+<br />Tailor your controller layout and make walking and menu access more comfortable.
+<br />[b]Highlights:[/b] 31 controller settings; wider walking range; short press for Map, long press for Game Hub; controller stutter fixes.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/449]Press to Gather - Configurable[/url][/color][/b]
+<br />Gather nearby harvestable resources with one keyboard press or controller hold.
+<br />[b]Highlights:[/b] Adjustable 10–200 m range; 14 controller button choices; support for 17 additional wild plant types.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/711]Less Wildlife[/url][/color][/b]
+<br />Make ordinary boar herds and wolf packs smaller—or larger.
+<br />[b]Highlights:[/b] Population from 10% to 200%; separate boar and wolf switches; quest and named animals keep their normal values.
+<br />
+<br />[size=4][b][color=#E8C88A]Your view, your style[/color][/b][/size]
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/452]Quiet Dawn - Configurable HUD[/url][/color][/b]
+<br />Clear the screen while keeping health and stamina alerts when you need them.
+<br />[b]Highlights:[/b] 17 panels with independent opacity and size; hold-to-peek; configurable combat cues, enemy information and effect icons.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/721]Style Without Sacrifice - Your Transmogrification Wardrobe[/url][/color][/b]
+<br />Choose your equipment's appearance while keeping its stats.
+<br />[b]Highlights:[/b] Separate day and night outfits; three saved presets; character preview; hide selected equipment; collected or all looks.
+<br />
+<br />[b][color=#A8D5C2][url=https://www.nexusmods.com/thebloodofdawnwalker/mods/694]Night Vision - Configurable[/url][/color][/b]
+<br />See in the dark as a vampire with natural colours or your preferred monochrome blend.
+<br />[b]Highlights:[/b] Independent brightness and colour controls; keyboard or controller toggle; stays enabled through save loading and camera changes.
+<br />

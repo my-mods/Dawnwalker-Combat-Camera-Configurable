@@ -1,1 +1,4 @@
-Keep the camera framing when using abilities while unlocked. Restore the normal Voracious Bite camera and pause camera-directed target switching during its transition.
+Fix nearest-enemy selection after a kill when the target lock clears early or the enemy dies while temporarily missing.
+Keep the latest attacker selected after tiny camera inputs, while still allowing deliberate aiming to choose another enemy.
+Fix targeting and camera tracking staying inactive outside scripted camera sequences.
+Choose Off, Error, Warning, Info or Debug logging; Warning is the default.

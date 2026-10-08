@@ -73,9 +73,9 @@
       ],
       "pending": {
         "impact": "minor",
-        "rationale": "Complete direct Nexus 3.4.2 delta reviewed: compatible five-level Logging/migration/coordinated native ABI, meaningful attacker gesture, corrected RebelCameraComponent scripted stack ownership, release provenance and player documentation, plus bounded verified-death handoff after early clear/current Dead/recovery Dead. Camera acquisition pauses only during one-second confirmation, preserving explicit replacement/hit priority/manual cancellation and shared 50ms/two-pass budgets. Independent P2 resolved; 98 kill scenarios/all old suites, current source menu and native ABI pass. No breaking settings. Consolidated 3.5.0-dev notes.",
+        "rationale": "Complete direct Nexus 3.4.2 delta reviewed: compatible five-level Logging/migration/coordinated native ABI, meaningful attacker gesture, corrected RebelCameraComponent scripted stack ownership, release provenance and player documentation, plus bounded verified-death handoff after early clear/current Dead/recovery Dead. Camera acquisition pauses only during one-second confirmation, preserving explicit replacement/hit priority/manual cancellation and shared 50ms/two-pass budgets. Independent P2 resolved; 98 kill scenarios/all old suites, current source menu and native ABI pass. No breaking settings. Consolidated 3.5.0-dev notes. Release preparation: verified unchanged live Nexus baseline on 2026-10-08; consolidated complete player changelog and preserved published page formatting/history.",
         "majorOverride": false,
-        "reviewedInputs": "9eb146a3a321ebad38706e472368051353ce1932929a72b60a9d350fb7c312b8",
+        "reviewedInputs": "539b37c49c35c320ec3024a9e11b8661a421f3f18b4fae76eb82942a1d2f535a",
         "divergenceReviewed": false
       }
     }

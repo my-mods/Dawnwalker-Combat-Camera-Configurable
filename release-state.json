@@ -8,19 +8,18 @@
       "packageFormat": 1,
       "baseline": {
         "kind": "nexus",
-        "version": "3.4.2",
-        "normalizedVersion": "3.4.2",
-        "sourceCommit": "0642dd8f6a604a72c19a424ff74b8b56d633f3e0",
-        "sourceTag": "v3.4.2",
-        "archiveSha256": "e64a563466205103ca851821511219788a3119242a930cf9785f33d4990eb4f9",
-        "verifiedAt": "2026-10-07T12:13:08.9505377Z",
+        "version": "3.5.0",
+        "normalizedVersion": "3.5.0",
+        "sourceCommit": "5ea074c66c806499772027515a797dd7bf41d1a7",
+        "archiveSha256": "812bcf78cc58063044e4cd56b66ba709e999e312a505e31201c5afe19c5658c8",
+        "verifiedAt": "2026-10-11T15:39:31.690Z",
         "nexus": {
           "game": "thebloodofdawnwalker",
           "pageId": "480",
           "modId": "41742787150304",
           "fileChainId": "7960683",
-          "versionId": "41742787152938",
-          "siteFileId": "3114"
+          "versionId": "41742787152993",
+          "siteFileId": "3169"
         }
       },
       "bindings": [
@@ -73,9 +72,9 @@
       ],
       "pending": {
         "impact": "minor",
-        "rationale": "Reviewed complete direct delta from Nexus 3.4.2: five-level logging and migration, attacker gesture and scripted-camera corrections, bounded target-death notification/retarget fixes, plus optional combat-start lock (Off by default; camera-facing or closest in Smooth/Native modes). New setting uses a distinct 17-value native ABI, actual combat notifications, two-pass/shared-budget selection, cancellation and preference-preserving migration. Compatible feature additions require one minor increment; player documents updated. No published release requested.",
+        "rationale": "Direct delta from verified Nexus 3.5.0 adds optional default-Off combat-start lock in Smooth/Native modes with camera-facing or closest enemy selection and preference-preserving migration. Release 3.6.0; native release version rebuilt twice identically. Public changelog preserves 3.5.0 history and describes only the new feature.",
         "majorOverride": false,
-        "reviewedInputs": "7497eb907f9a1cf3b1af1311a2057050262e1fec93467d7d85d2d9545df9da49",
+        "reviewedInputs": "f8ec1efe01d72353a7db3776175d310513bfefc702673898515f44ab2964bd31",
         "divergenceReviewed": false
       }
     }

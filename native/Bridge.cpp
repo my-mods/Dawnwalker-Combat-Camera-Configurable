@@ -19,6 +19,7 @@
 #include "Bridge.hpp"
 #include "GameBuild.hpp"
 #include "GameCode.hpp"
+#include "CombatEvents.hpp"
 
 extern "C" {
     void CameraGate(); void ConeGate(); void ForwardGate();
@@ -58,7 +59,7 @@ DWORD gameThread{};
 bool attempted{};
 bool inputSupported{true};
 std::wstring startError;
-std::array<void*,37> hooked{};size_t hookCount{};
+std::array<void*,39> hooked{};size_t hookCount{};
 RequestBudget requestBudget;
 RequestBudget assistBudget;
 double coneThreshold{-1};
@@ -108,6 +109,11 @@ Dwell dwell;
 bool nextFallback{};
 bool playerLocked{};
 uint64_t lockIntent{};
+bool combatStarted{},startFallback{},startAcquiring{};
+double startRemaining{};uint64_t startIntent{};
+void clearStart(){startRemaining=0;startFallback=false;}
+void (*originalCombatStart)(void*);
+void (*originalCombatEnd)(void*);
 double deathRemaining{};
 bool deathFallback{};
 // A clear is not proof of death: the native OnDeath delegate may run before
@@ -193,7 +199,7 @@ void* resolveAttacker(const Identity& id) {
 }
 double assistScale{1.0};uint64_t assistAt{};
 void clearSession() {
-    ++lockIntent;clearDeath();
+    ++lockIntent;clearDeath();clearStart();combatStarted=false;
     attackerSelectionInvalidated=true;
     abilityTargetId={};abilityActorId={};abilityQueried=false;
     cameraInitialized=false;scriptedCamera=false;
@@ -246,7 +252,7 @@ bool managed(void* combat,bool cameraContext=false) {
     auto pawn=field<void*>(combat,0xa8);
     if(!gameplay(pawn,true,startingEffectOwner==combat)||field<void*>(pawn,0xc90)!=combat){
         auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
-        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();clearDeath();}
+        if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){clearStart();cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();clearDeath();}
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
@@ -375,6 +381,7 @@ struct Metrics {
     uint64_t trackingAttempts{},trackingSteps{},trackingMoves{},trackingInput{},trackingMicros{};
     uint64_t temporaryLosses{},targetRecoveries{},recoveryMisses{},trackedClears{},recoveryAttempts{},recoveryMicros{};
     uint64_t attackerHits{},attackerSwitches{},attackerRejected{},attackerOverrides{},attackerMicros{};
+    uint64_t startEvents{},startSearches{},startLocks{},startMisses{},startMicros{};
     uint64_t autoLocks{},targetDeaths{},deathSearches{},deathSwitches{},deathMisses{},deathMicros{},deathEvents{},deathEventClears{};
     uint64_t focusQueries{},focusTargets{},focusMicros{},abilityRejected{},abilityTraceSuppressed{},abilityViewsPrevented{};
     uint64_t since{};
@@ -416,6 +423,8 @@ void report(uint64_t now) {
         L" targeting="+(playerLocked?(settings.targeting?std::wstring(L"camera"):std::wstring(L"fixed")):std::wstring(L"off"))+
         L" attackerHits="+std::to_wstring(metrics.attackerHits)+L" attackerSwitches="+std::to_wstring(metrics.attackerSwitches)+
         L" attackerRejected="+std::to_wstring(metrics.attackerRejected)+L" attackerOverrides="+std::to_wstring(metrics.attackerOverrides)+L" attackerUs="+std::to_wstring(metrics.attackerMicros)+
+        L" startEvents="+std::to_wstring(metrics.startEvents)+L" startSearches="+std::to_wstring(metrics.startSearches)+
+        L" startLocks="+std::to_wstring(metrics.startLocks)+L" startMisses="+std::to_wstring(metrics.startMisses)+L" startUs="+std::to_wstring(metrics.startMicros)+
         L" autoLocks="+std::to_wstring(metrics.autoLocks)+L" targetDeaths="+std::to_wstring(metrics.targetDeaths)+
         L" deathSearches="+std::to_wstring(metrics.deathSearches)+L" deathSwitches="+std::to_wstring(metrics.deathSwitches)+
         L" deathMisses="+std::to_wstring(metrics.deathMisses)+L" deathUs="+std::to_wstring(metrics.deathMicros)+
@@ -674,6 +683,63 @@ void applyDeath(void* combat,float delta) {
     nearestTargetId={};nearestActorId={};
     if(settings.debugLogging)metrics.deathMicros+=clockMicros()-before;
 }
+// Notification callbacks retain no borrowed engine arguments. The existing tick
+// owns selection: at most two native passes, sharing its 50 ms budget.
+void combatStart(void* combat) {
+    const bool local=live()&&managed(combat,true);
+    const auto owner=ownerId;const auto intent=lockIntent;
+    originalCombatStart(combat);
+    if(!local||!live()||owner!=ownerId||intent!=lockIntent||!sameCurrent(combat,owner))return;
+    if(combatStarted)return;
+    combatStarted=true;
+    if(settings.debugLogging)++metrics.startEvents;
+    if(settings.combatStartLock&&settings.cameraMode!=0&&!playerLocked){
+        startRemaining=3.0;startFallback=false;startIntent=lockIntent;
+    }
+}
+void combatEnd(void* combat) {
+    if(live()&&ownerId.address==reinterpret_cast<uintptr_t>(combat)){clearStart();combatStarted=false;}
+    originalCombatEnd(combat);
+}
+void applyCombatStart(void* combat,float delta) {
+    if(!startRemaining)return;
+    if(!settings.combatStartLock||settings.cameraMode==0||startIntent!=lockIntent||playerLocked||attackerRemaining||
+       !std::isfinite(delta)||delta<0||delta>=startRemaining){clearStart();return;}
+    startRemaining-=delta;
+    if(inRequest||!eligible(combat,true))return;
+    auto config=field<void*>(combat,0x9b8);const float distance=config?field<float>(config,0x26c):0;
+    if(!std::isfinite(distance)||distance<=0||distance>=1000000){clearStart();return;}
+    if(!requestBudget.take(GetTickCount64()))return;
+    const auto owner=ownerId;const auto intent=lockIntent;
+    const bool fallback=startFallback,nearest=settings.combatStartLock==2;
+    const auto before=settings.debugLogging?clockMicros():0;
+    if(settings.debugLogging)++metrics.startSearches;
+    const auto previous=selecting;const auto oldIntent=acquireIntent;
+    const bool wasRequest=inRequest,wasAcquiring=autoAcquiring;
+    selecting=combat;inRequest=true;autoAcquiring=true;startAcquiring=true;acquireIntent=intent;
+    nearestSelecting=nearest;nearestFallback=fallback;nearestTargetId={};nearestActorId={};
+    automaticRequest=!nearest;fallbackRequest=fallback;
+    originalSwitch(combat,2,distance,false,false,false,false,false);
+    automaticRequest=false;fallbackRequest=false;nearestSelecting=false;nearestFallback=false;startAcquiring=false;
+    selecting=previous;inRequest=wasRequest;autoAcquiring=wasAcquiring;acquireIntent=oldIntent;
+    syncSession();session.watched[12]=-1;session.watched[13]=-1;
+    if(owner==ownerId&&intent==lockIntent&&sameCurrent(combat,owner)&&live()&&startRemaining){
+        if(playerLocked){
+            if(nearestTargetId.address&&resolveAttacker(nearestTargetId)&&resolveAttacker(nearestActorId)&&
+               field<void*>(combat,0x1380)==reinterpret_cast<void*>(nearestTargetId.address)){
+                attackerHeldTargetId=identity(reinterpret_cast<void*>(nearestTargetId.address));
+                attackerHeldActorId=identity(reinterpret_cast<void*>(nearestActorId.address));
+                session.watched[10]=attackerHeldTargetId.index;session.watched[11]=attackerHeldActorId.index;
+                clearAttackerLook();
+            }
+            if(settings.debugLogging)++metrics.startLocks;
+            clearStart();
+        }else if(fallback){clearStart();if(settings.debugLogging)++metrics.startMisses;}
+        else startFallback=true;
+    }
+    nearestTargetId={};nearestActorId={};nextFallback=false;
+    if(settings.debugLogging)metrics.startMicros+=clockMicros()-before;
+}
 void confirmTargetDeath();
 bool applyRecovery(void* combat) {
     if(!recoveryRemaining||!recoveryReady||recoveryRetry||inRequest||attackerRemaining)return false;
@@ -788,6 +854,9 @@ void tick(void* pawn,float delta) {
         applyAttacker(combat,delta);
         applyDeath(combat,delta);
     }
+    if(startRemaining){
+        if(managed(combat,true))applyCombatStart(combat,delta);else clearStart();
+    }
     if(settings.targeting&&!attackerRemaining&&(!attackerHeldTargetId.address||attackerLookOverride)&&gameplay(pawn))request(combat);
     else if(settings.targeting&&settings.aimAssist&&eligible(combat)){
         auto now=GetTickCount64();if(assistBudget.take(now))updateAssist(combat,now);
@@ -893,13 +962,17 @@ void* pick(void* context) {
     if(settings.debugLogging)++metrics.dwellChecks;
     return originalPick(context)?previous:chosen;
 }
+bool acquisitionEnabled() {
+    return startAcquiring ? settings.combatStartLock&&settings.cameraMode!=0&&startRemaining&&combatStarted&&!attackerRemaining
+                          : settings.autoLockOnHit;
+}
 void setTarget(void* combat,void* target) {
     // SwitchLockTarget already performs native range, visibility and eligibility
     // checks and assigns a native weak serial before calling this setter.
     if(focusQuery&&focusQuery->combat==combat){focusQuery->target=identity(target);return;}
     // A cancelled automatic request must not fall through as an ordinary
     // native target write after a nested Apply, unlock or owner invalidation.
-    if(autoAcquiring&&(!live()||acquireIntent!=lockIntent||!settings.autoLockOnHit))return;
+    if(autoAcquiring&&(!live()||acquireIntent!=lockIntent||!acquisitionEnabled()))return;
     const bool local=managed(combat,target==nullptr&&settings.autoLockOnHit);
     if((!local||(scriptedCamera&&ownerId.address==reinterpret_cast<uintptr_t>(combat)))&&
        (automaticRequest||attackerSelecting||nearestSelecting))return;
@@ -909,10 +982,10 @@ void setTarget(void* combat,void* target) {
        (target&&(resolveAttacker(recoveryTargetId)!=target||resolveAttacker(recoveryActorId)!=recovering))))return;
     if(local){
         if(target&&(selecting!=combat||(!playerLocked&&!autoAcquiring)||
-           (autoAcquiring&&(acquireIntent!=lockIntent||!settings.autoLockOnHit)))){
+           (autoAcquiring&&(acquireIntent!=lockIntent||!acquisitionEnabled())))){
             if(settings.debugLogging)++metrics.blockedTargets;return;
         }
-        if(target&&nearestSelecting){
+        if(target&&(nearestSelecting||startAcquiring)){
             nearestTargetId=identity(target);
             nearestActorId=nearestTargetId.address?identity(field<void*>(target,0xa8)):Identity{};
             if(!nearestTargetId.address||!nearestActorId.address)return;
@@ -1364,7 +1437,7 @@ void configure(Settings value) {
     const bool cameraChanged=settings.cameraMode!=value.cameraMode;
     if(attackerHeldTargetId.address)clearAttackerLook();
     else attackerGesture.clear();
-    ++lockIntent;clearDeath();
+    ++lockIntent;clearDeath();clearStart();
     if(settings.lockLastAttacker!=value.lockLastAttacker||settings.autoLockOnHit!=value.autoLockOnHit)clearAttacker();
     settings=value;coneThreshold=value.coneDegrees?std::max(Build::nativeCone,std::cos(value.coneDegrees*3.14159265358979323846/180.0)):Build::nativeCone;
     cameraLogging.store(value.debugLogging,std::memory_order_relaxed);
@@ -1425,6 +1498,14 @@ bool start(std::wstring& error) {
             deathEventsSupported=false;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Target-death notification unavailable: "+std::wstring(reason.begin(),reason.end())+L". State-based death detection and other features remain available.\n");
         }
+        uintptr_t combatStartRva{},combatEndRva{};
+        try{
+            combatStartRva=CombatEvents::resolve(moduleBase,0x7e21270,"OnCombatStarted");
+            combatEndRva=CombatEvents::resolve(moduleBase,0x7e21260,"OnCombatEnded");
+        }catch(const std::exception& failure){
+            combatStartRva=combatEndRva=0;const std::string reason=failure.what();
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Combat-start lock unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera features remain available.\n");
+        }
         auto status=MH_Initialize();if(status!=MH_OK&&status!=MH_ERROR_ALREADY_INITIALIZED)throw std::runtime_error("MinHook initialization failed");
         // Engine's validated FName constructor. Store only value IDs; resolve
         // input action names once on the game thread at startup.
@@ -1453,6 +1534,10 @@ bool start(std::wstring& error) {
         if(deathEventsSupported){
             hook(Build::TargetDeathExecute,&deathExecute,originalDeathExecute);
             hook(Build::TargetDeathExecuteSafe,&deathExecuteSafe,originalDeathExecuteSafe);
+        }
+        if(combatStartRva&&combatEndRva){
+            hook(combatStartRva,&combatStart,originalCombatStart);
+            hook(combatEndRva,&combatEnd,originalCombatEnd);
         }
         hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);

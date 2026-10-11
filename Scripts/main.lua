@@ -13,9 +13,9 @@ local function apply(newValues)
     values=Settings.normalize(newValues)
     ModDiagnosticLevel=values.logLevel
     local args={};for _,id in ipairs(Settings.order)do args[#args+1]=values[id] end
-    _CCSetLogV2(table.unpack(args))
+    _CCSetCombatV3(table.unpack(args))
 end
-if type(_CCSetLogV2)~="function" or type(_CCStart)~="function" then
+if type(_CCSetCombatV3)~="function" or type(_CCStart)~="function" then
     if values.logLevel>=1 then print("[CombatCamera][ERROR] Native component unavailable; verify the complete archive is enabled.\n") end
     return
 end

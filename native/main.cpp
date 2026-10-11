@@ -9,10 +9,10 @@ static_assert(sizeof(CppUserModBase)==192,"Unsupported UE4SS C++ host layout");
 static int nativeLogLevel=2;
 class CombatCameraMod final:public CppUserModBase {
 public:
-    CombatCameraMod(){ ModName=STR("Combat Camera - Configurable");ModVersion=STR("3.5.0");ModAuthors=STR("my-mods"); }
+    CombatCameraMod(){ ModName=STR("Combat Camera - Configurable");ModVersion=STR("3.5.0-dev");ModAuthors=STR("my-mods"); }
     void on_lua_start(StringViewType name,Lua& lua,Lua&,Lua&,Lua*) override {
         if(name!=STR("CombatCamera"))return;
-        lua.register_function("_CCSetLogV2",[](const Lua& l){
+        lua.register_function("_CCSetCombatV3",[](const Lua& l){
             // get_integer removes the argument from the host Lua stack.
             // Each next setting is therefore at index 1, in Settings.order.
             auto number=[&](int lo,int hi){return static_cast<int>(std::clamp<int64_t>(l.get_integer(1),lo,hi));};
@@ -24,7 +24,7 @@ public:
             s.cameraMode=number(0,2);s.trackingSpeed=number(10,100);s.trackingResumeMs=number(0,3000);
             s.lockLastAttacker=number(0,1)!=0;
             s.autoLockOnHit=number(0,1)!=0;s.afterTargetDeath=number(0,1);
-            s.trackingCatchup=number(100,500);
+            s.trackingCatchup=number(100,500);s.combatStartLock=number(0,2);
             CombatCamera::configure(s);return 0;
         });
         lua.register_function("_CCStart",[](const Lua& l){

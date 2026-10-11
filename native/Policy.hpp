@@ -16,6 +16,7 @@ struct Settings {
     bool lockLastAttacker{false};
     bool autoLockOnHit{true};
     int afterTargetDeath{0}; // 0: nearest eligible enemy, 1: wait for another hit.
+    int combatStartLock{0}; // Off, facing camera, closest enemy; tracking modes only.
     int trackingCatchup{300}; // Maximum angular-error boost; 100 disables it.
 };
 struct Vec3 { double x{}, y{}, z{}; };

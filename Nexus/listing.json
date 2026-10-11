@@ -7,7 +7,7 @@
     "modId": 480,
     "fileId": 3061
   },
-  "version": "3.5.0",
+  "version": "3.5.0-dev",
   "category": "Gameplay",
   "author": "my-mods",
   "summary": "Choose Free Camera, Smooth Tracking or Native Tracking independently of target selection. Smooth tracking gently follows locked enemies, yields to manual camera movement, and resumes after an adjustable delay. Set its tracking strength in Mod Setting Menu.",
@@ -20,10 +20,10 @@
   "file": {
     "displayName": "Combat Camera - Configurable",
     "filename": "Combat-Camera-Configurable.zip",
-    "version": "3.5.0",
+    "version": "3.5.0-dev",
     "category": "Main",
     "modManagerDownload": true,
-    "description": "Fix switching to the nearest enemy after a kill, including enemies that disappear briefly.\nSmall camera movements no longer switch away from the enemy who last hit you; you can still aim at another enemy to change targets.\nFix target selection and camera tracking sometimes stopping during normal play.\nChoose Off, Error, Warning, Info or Debug logging; Warning is the default."
+    "description": "Optionally lock onto a camera-facing or closest enemy when combat starts with Smooth or Native tracking. Off by default.\nFix switching to the nearest enemy after a kill, including enemies that disappear briefly.\nSmall camera movements no longer switch away from the enemy who last hit you; you can still aim at another enemy to change targets.\nFix target selection and camera tracking sometimes stopping during normal play.\nChoose Off, Error, Warning, Info or Debug logging; Warning is the default."
   },
   "requirements": [
     {

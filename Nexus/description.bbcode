@@ -57,6 +57,7 @@
 <br />[*][b][color=#A8D5C2]Target switch delay:[/color][/b] 65 ms by default; adjustable from 0 to 1000 ms.[/*]
 <br />[*][b][color=#A8D5C2]Lock to last attacker:[/color][/b] Off by default. On gives the latest attacker priority after a hit; deliberate camera aiming can override it when Camera-directed targeting is On. Hits while unlocked only turn target lock on when Automatic lock on hit is enabled. An attacker behind you can be selected without the camera cone or switch delay, while native range, visibility and eligibility rules still apply.[/*]
 <br />[*][b][color=#A8D5C2]Automatic lock on hit:[/color][/b] On by default. Acquire and switch to enemies whose attacks hit you, including blocks and parries. Works independently of Lock to last attacker.[/*]
+<br />[*][b][color=#A8D5C2]Lock at combat start:[/color][/b] Off by default. With Smooth or Native tracking, choose Facing camera or Closest enemy to start a fight locked onto an eligible enemy. Facing camera respects the targeting cone; Closest enemy includes enemies behind you. Manual unlock cancels the attempt for that fight. Free camera ignores this option.[/*]
 <br />[*][b][color=#A8D5C2]After target death:[/color][/b] Nearest enemy by default, or Wait for next hit. Applies when Automatic lock on hit is On. If no eligible enemy is in native range, remain unlocked until another hit or manual lock.[/*]
 <br />[/list]
 <br />[b][color=#E8C88A]Controller[/color][/b]
@@ -75,7 +76,7 @@
 <br />[*][b][color=#A8D5C2]Camera-directed targeting:[/color][/b] Target lock On, Camera-directed targeting On. Aim the camera toward an enemy to select them. Adjust the targeting cone and switch delay to control how selection responds.[/*]
 <br />[*][b][color=#A8D5C2]Fixed enemy selection:[/color][/b] Target lock On, Camera-directed targeting Off. Keep your chosen enemy selected. Smooth tracking temporarily yields when you look around. To choose someone else, unlock, aim toward the new enemy and lock again.[/*]
 <br />[*][b][color=#A8D5C2]Untargeted combat:[/color][/b] Target lock Off, with either targeting setting. Attack in the direction your camera is facing. Self-centered abilities cast without selecting an enemy; abilities that need a primary target use an enemy under your current camera aim without enabling target lock. Spells that need an enemy will not cast if no valid target is available. Using abilities without a locked target no longer moves your camera unexpectedly.[/*]
-<br />[/list]Both locked modes keep their target-based attack direction. Moving the right stick or mouse controls the camera and does not cycle a fixed target. Changing camera or targeting settings preserves your current lock state. Leaving combat or loading a new player starts untargeted.
+<br />[/list]Both locked modes keep their target-based attack direction. Moving the right stick or mouse controls the camera and does not cycle a fixed target. Changing camera or targeting settings preserves your current lock state. Leaving combat or loading a new player clears the lock. Lock at combat start can acquire an enemy at the next combat-start event.
 <br />
 <br />Camera-directed searches run only while target lock and Camera-directed targeting are both on, and pause while a last attacker has priority until you move the camera to choose another enemy.
 <br />

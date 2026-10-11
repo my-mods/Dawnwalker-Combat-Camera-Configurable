@@ -8,19 +8,21 @@
       "packageFormat": 1,
       "baseline": {
         "kind": "nexus",
-        "version": "3.5.0",
-        "normalizedVersion": "3.5.0",
-        "sourceCommit": "5ea074c66c806499772027515a797dd7bf41d1a7",
-        "archiveSha256": "812bcf78cc58063044e4cd56b66ba709e999e312a505e31201c5afe19c5658c8",
-        "verifiedAt": "2026-10-11T15:39:31.690Z",
+        "version": "3.6.0",
+        "normalizedVersion": "3.6.0",
+        "sourceCommit": "1f6c0509344c2956e53042ecd289f0d6fee03335",
+        "sourceTag": "v3.6.0",
+        "archiveSha256": "daf67caa9cf0e1fb838a7974e0b48fcac670a369d88f00ed14c2aba134384170",
+        "verifiedAt": "2026-10-11T15:51:51.627Z",
         "nexus": {
           "game": "thebloodofdawnwalker",
           "pageId": "480",
           "modId": "41742787150304",
           "fileChainId": "7960683",
-          "versionId": "41742787152993",
-          "siteFileId": "3169"
-        }
+          "versionId": "41742787153074",
+          "siteFileId": "3250"
+        },
+        "sourceFingerprint": "f8ec1efe01d72353a7db3776175d310513bfefc702673898515f44ab2964bd31"
       },
       "bindings": [
         {
@@ -71,11 +73,42 @@
         "VortexExtension"
       ],
       "pending": {
-        "impact": "minor",
-        "rationale": "Direct delta from verified Nexus 3.5.0 adds optional default-Off combat-start lock in Smooth/Native modes with camera-facing or closest enemy selection and preference-preserving migration. Release 3.6.0; native release version rebuilt twice identically. Public changelog preserves 3.5.0 history and describes only the new feature.",
+        "impact": "none",
+        "rationale": "Matches the verified Nexus release.",
         "majorOverride": false,
         "reviewedInputs": "f8ec1efe01d72353a7db3776175d310513bfefc702673898515f44ab2964bd31",
         "divergenceReviewed": false
+      },
+      "publication": {
+        "github": {
+          "destination": "github",
+          "verified": true,
+          "verifiedAt": "2026-10-11T15:51:51.627Z",
+          "version": "3.6.0",
+          "sourceCommit": "1f6c0509344c2956e53042ecd289f0d6fee03335",
+          "tag": "v3.6.0",
+          "archiveSha256": "daf67caa9cf0e1fb838a7974e0b48fcac670a369d88f00ed14c2aba134384170",
+          "url": "https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable/releases/tag/v3.6.0",
+          "prerelease": true
+        },
+        "nexus": {
+          "destination": "nexus",
+          "verified": true,
+          "verifiedAt": "2026-10-11T15:51:51.627Z",
+          "version": "3.6.0",
+          "sourceCommit": "1f6c0509344c2956e53042ecd289f0d6fee03335",
+          "tag": "v3.6.0",
+          "archiveSha256": "daf67caa9cf0e1fb838a7974e0b48fcac670a369d88f00ed14c2aba134384170",
+          "nexus": {
+            "game": "thebloodofdawnwalker",
+            "pageId": "480",
+            "modId": "41742787150304",
+            "fileChainId": "7960683",
+            "versionId": "41742787153074",
+            "siteFileId": "3250"
+          },
+          "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/480"
+        }
       }
     }
   }

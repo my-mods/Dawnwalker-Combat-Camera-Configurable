@@ -1,4 +1,4 @@
-// Native interoperability for Steam build 25232147. All UObject access is on
+// Native interoperability for Dawnwalker 1.1 / Steam build 25915545. All UObject access is on
 // the game thread. No object enumeration, worker, overlay window or INI watch.
 #include <Mod/CppUserModBase.hpp>
 #include <Unreal/UObjectArray.hpp>
@@ -18,6 +18,8 @@
 #include <stdexcept>
 #include "Bridge.hpp"
 #include "GameBuild.hpp"
+#include "GameLayout.hpp"
+#include "LockInput.hpp"
 #include "GameCode.hpp"
 #include "CombatEvents.hpp"
 
@@ -69,7 +71,7 @@ struct Identity {
 };
 Identity identity(void* object) {
     if(!object)return {};
-    auto index=field<int>(object,0xc);
+    auto index=field<int>(object,Layout::ObjectIndex);
     auto item=FUObjectArray::IndexToObject(index);
     if(!item||item->GetUObject()!=object||!FUObjectArray::IsValid(item,false))return {};
     return {reinterpret_cast<uintptr_t>(object),index,item->GetSerialNumber()};
@@ -226,38 +228,38 @@ bool sameCurrent(void* object,const Identity& id){return id.address && identity(
 // These relations are checked together, rather than treating a non-null
 // controller/pawn/component pointer as a sufficient gameplay context.
 int gameplay(void* pawn,bool cameraContext=false,bool focusView=false) {
-    if(!pawn||field<uint8_t>(pawn,0x660))return 0;
-    auto pc=field<void*>(pawn,0x2e8);auto combat=field<void*>(pawn,0xc90);
-    if(!pc||!combat||field<uint8_t>(pc,0x6ec)!=1||field<void*>(pc,0x8b8)!=pawn||
-       field<void*>(pc,0x2f8)!=pawn||field<void*>(combat,0xa8)!=pawn||field<int>(pc,0x8c0)!=0)return 0;
+    if(!pawn||field<uint8_t>(pawn,Layout::PawnCinematic))return 0;
+    auto pc=field<void*>(pawn,Layout::PawnController);auto combat=field<void*>(pawn,Layout::PawnCombat);
+    if(!pc||!combat||field<uint8_t>(pc,Layout::ControllerLocal)!=1||field<void*>(pc,Layout::ControllerCharacter)!=pawn||
+       field<void*>(pc,Layout::ControllerPawn)!=pawn||field<void*>(combat,Layout::ComponentOwner)!=pawn||field<int>(pc,Layout::ControllerInputBlocks)!=0)return 0;
     // Focus can enable cinematic mode after requesting its view. Only the
     // verified focus-view callers may retain camera control in that state.
-    if(!focusView&&(field<uint8_t>(pc,0x4c8)&2))return 0;
-    const auto action=field<uint8_t>(combat,0xb28);
+    if(!focusView&&(field<uint8_t>(pc,Layout::ControllerCinematic)&2))return 0;
+    const auto action=field<uint8_t>(combat,Layout::CombatState);
     // Synchronised actions belong to the game's camera and targeting rules.
     if(action==10||(!cameraContext&&action==11))return 0;
-    return (field<uint8_t>(combat,0x8e)&0x10)&&field<uint8_t>(combat,0xdb8)<=2&&field<uint8_t>(combat,0xdbc)==0?2:1;
+    return (field<uint8_t>(combat,Layout::ComponentFlags)&0x10)&&field<uint8_t>(combat,Layout::CombatMode)<=2&&field<uint8_t>(combat,Layout::CombatModeBlocked)==0?2:1;
 }
 void* playerCameraComponent(void* pawn) {
-    // Native player construction stores RebelCameraComponent at +c58.
+    // Native player construction stores RebelCameraComponent at Layout::PawnCamera.
     // Its +a70 mode stack is NOT part of controller+370's camera manager.
-    auto component=field<void*>(pawn,0xc58);
+    auto component=field<void*>(pawn,Layout::PawnCamera);
     return identity(component).address&&field<void*>(component,0)==at<void*>(Build::CameraComponentVtable)&&
-        field<void*>(component,0xa8)==pawn?component:nullptr;
+        field<void*>(component,Layout::ComponentOwner)==pawn?component:nullptr;
 }
 bool managed(void* combat,bool cameraContext=false) {
     if(!live()||!combat)return false;
     if(field<void*>(combat,0)!=at<void*>(Build::PlayerCombatVtable))return false;
     syncSession();
-    auto pawn=field<void*>(combat,0xa8);
-    if(!gameplay(pawn,true,startingEffectOwner==combat)||field<void*>(pawn,0xc90)!=combat){
+    auto pawn=field<void*>(combat,Layout::ComponentOwner);
+    if(!gameplay(pawn,true,startingEffectOwner==combat)||field<void*>(pawn,Layout::PawnCombat)!=combat){
         auto expected=combat;cameraOwner.compare_exchange_strong(expected,nullptr,std::memory_order_acq_rel);
         if(ownerId.address==reinterpret_cast<uintptr_t>(combat)){clearStart();cameraInitialized=false;clearTracking();abandonRecovery();clearAttacker();clearDeath();}
         return false;
     }
     auto id=identity(combat);if(!id.address)return false;
     if(id!=ownerId){clearSession();ownerId=id;session.watched[0]=id.index;}
-    bool scripted=field<uint8_t>(combat,0xb28)==11||startingEffectOwner==combat;
+    bool scripted=field<uint8_t>(combat,Layout::CombatState)==11||startingEffectOwner==combat;
     // Effects can outlive the synchronised action, including their blend out.
     // Inspect the owning component's small stack only on adoption or while a
     // scripted handoff is outstanding. Activation wakes this path immediately.
@@ -271,7 +273,7 @@ bool managed(void* combat,bool cameraContext=false) {
             struct Entry {int handle,padding;void* mode;};
             struct Stack {Entry* data;int size,capacity;};
             static_assert(sizeof(Entry)==16&&sizeof(Stack)==16);
-            const auto stack=field<Stack>(component,0xa70);
+            const auto stack=field<Stack>(component,Layout::CameraStack);
             if(stack.size<0||stack.size>64||stack.size>stack.capacity||(!stack.data&&stack.size)){
                 scripted=true;
                 if(settings.debugLogging)++cameraMetrics.scriptedInvalidStacks;
@@ -280,7 +282,7 @@ bool managed(void* combat,bool cameraContext=false) {
                 if(settings.debugLogging)++cameraMetrics.scriptedEntries;
                 auto mode=stack.data[i].mode;
                 if(mode&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)&&
-                   field<void*>(mode,0x20)==component&&field<uint8_t>(mode,0x814)!=3){scripted=true;break;}
+                   field<void*>(mode,Layout::ObjectOuter)==component&&field<uint8_t>(mode,Layout::EffectBlendState)!=3){scripted=true;break;}
             }
         }
     }
@@ -289,15 +291,15 @@ bool managed(void* combat,bool cameraContext=false) {
         pendingId={};session.watched[3]=-1;nextFallback=false;assistScale=1;assistAt=0;
         if(settings.debugLogging){if(scripted)++cameraMetrics.scriptedStarts;else ++cameraMetrics.scriptedEnds;}
     }
-    const bool native=scripted||(settings.cameraMode==2&&playerLocked&&field<void*>(combat,0x1380));
+    const bool native=scripted||(settings.cameraMode==2&&playerLocked&&field<void*>(combat,Layout::CombatTarget));
     cameraOwner.store(native?nullptr:combat,std::memory_order_release);
     // Reconcile once on adoption or a policy transition. No repeated detach
     // repair, native lock broadcast or per-frame attachment writes.
-    if((!cameraInitialized||nativeCamera!=native)&&(field<uint8_t>(combat,0x8e)&0x10)){
+    if((!cameraInitialized||nativeCamera!=native)&&(field<uint8_t>(combat,Layout::ComponentFlags)&0x10)){
         cameraInitialized=true;nativeCamera=native;
         if(native){
             at<void(*)(void*)>(Build::AttachDirect)(combat);
-        }else if(!field<uint8_t>(combat,0x137a)){
+        }else if(!field<uint8_t>(combat,Layout::CameraDetached)){
             at<void(*)(void*)>(Build::DetachCamera)(combat);
             if(settings.debugLogging)cameraMetrics.initialDetaches.fetch_add(1,std::memory_order_relaxed);
         }
@@ -313,9 +315,9 @@ void effectStart(void* mode) {
     if(live()&&mode){
         syncSession();auto combat=resolve(ownerId);
         if(combat){
-            auto pawn=field<void*>(combat,0xa8);
+            auto pawn=field<void*>(combat,Layout::ComponentOwner);
             auto component=pawn?playerCameraComponent(pawn):nullptr;
-            if(component&&field<void*>(mode,0x20)==component&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)){
+            if(component&&field<void*>(mode,Layout::ObjectOuter)==component&&field<void*>(mode,0)==at<void*>(Build::EffectCameraVtable)){
                 startingEffectOwner=combat;managed(combat,true);
             }
         }
@@ -323,9 +325,9 @@ void effectStart(void* mode) {
     originalEffectStart(mode);startingEffectOwner=previous;
 }
 bool eligible(void* combat,bool acquiring=false) {
-    if(!managed(combat)||(!playerLocked&&!acquiring)||!(field<uint8_t>(combat,0x8e)&0x10)||
-       field<uint8_t>(combat,0x1612))return false;
-    auto action=field<uint8_t>(combat,0xb28);
+    if(!managed(combat)||(!playerLocked&&!acquiring)||!(field<uint8_t>(combat,Layout::ComponentFlags)&0x10)||
+       field<uint8_t>(combat,Layout::CombatIneligible))return false;
+    auto action=field<uint8_t>(combat,Layout::CombatState);
     return action!=1&&action!=2&&action!=10&&action!=11&&action!=12;
 }
 using Tick=void(*)(void*,float);Tick originalTick{};
@@ -446,18 +448,18 @@ void smoothView(void* camera,float delta,Vec3* view,Vec3* input) {
     syncSession();
     auto combat=reinterpret_cast<void*>(ownerId.address);
     if(!sameCurrent(combat,ownerId)||!managed(combat)||!playerLocked||
-       !(field<uint8_t>(combat,0x8e)&0x10)||!view||!input||!finite(*view)||!finite(*input)){
+       !(field<uint8_t>(combat,Layout::ComponentFlags)&0x10)||!view||!input||!finite(*view)||!finite(*input)){
         clearTracking();abandonRecovery();return;
     }
-    auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
-    if(field<void*>(pc,0x370)!=camera||field<void*>(camera,0)!=at<void*>(Build::PlayerCameraVtable)){
+    auto pawn=field<void*>(combat,Layout::ComponentOwner),pc=field<void*>(pawn,Layout::PawnController);
+    if(field<void*>(pc,Layout::ControllerCamera)!=camera||field<void*>(camera,0)!=at<void*>(Build::PlayerCameraVtable)){
         clearTracking();return;
     }
     if(recoveryRemaining&&(input->x!=0.0||input->y!=0.0)){recoveryHadLook=true;recoveryLookAt=GetTickCount64();}
-    auto target=field<void*>(combat,0x1380);
+    auto target=field<void*>(combat,Layout::CombatTarget);
     const auto targetId=identity(target);
     if(!targetId.address){clearTracking();return;}
-    auto actor=field<void*>(target,0xa8);const auto actorId=identity(actor);
+    auto actor=field<void*>(target,Layout::ComponentOwner);const auto actorId=identity(actor);
     if(!actorId.address){clearTracking();return;}
     if(targetId!=trackingTargetId||actorId!=trackingActorId){
         const double quiet=trackingTargetId.address?tracking.quiet:settings.trackingResumeMs*0.001;
@@ -474,11 +476,11 @@ void smoothView(void* camera,float delta,Vec3* view,Vec3* input) {
     }
     Vec3 desired=*view;
     if(!manual){
-        Vec3 point{};auto getPoint=method<Vec3*(*)(void*,Vec3*,void*)>(actor,0x6f0);
+        Vec3 point{};auto getPoint=method<Vec3*(*)(void*,Vec3*,void*)>(actor,Layout::ActorAimPointSlot);
         auto value=getPoint?getPoint(actor,&point,pawn):nullptr;
         if(!value){clearTracking();return;}point=*value;
         Vec3 origin{},current{};
-        if(!readCameraVector(camera,0x828,origin)||!readCameraVector(camera,0x820,current)){clearTracking();return;}
+        if(!readCameraVector(camera,Layout::CameraOriginSlot,origin)||!readCameraVector(camera,Layout::CameraRotationSlot,current)){clearTracking();return;}
         Vec3 offset{point.x-origin.x,point.y-origin.y,point.z-origin.z};
         const double planar=std::hypot(offset.x,offset.y),distance=std::hypot(planar,offset.z);
         if(!finite(point)||!finite(origin)||!finite(current)||!std::isfinite(distance)||distance<1e-4){clearTracking();return;}
@@ -515,8 +517,8 @@ void viewRotation(void* camera,float delta,Vec3* view,Vec3* input) {
                 (input->x!=0.0||input->y!=0.0||attackerGesture.active)){
             auto combat=resolve(ownerId);
             if(combat&&managed(combat)&&attackerHeldTargetId.address){
-                auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
-                if(field<void*>(pc,0x370)==camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)&&
+                auto pawn=field<void*>(combat,Layout::ComponentOwner),pc=field<void*>(pawn,Layout::PawnController);
+                if(field<void*>(pc,Layout::ControllerCamera)==camera&&field<void*>(camera,0)==at<void*>(Build::PlayerCameraVtable)&&
                    attackerGesture.observe(*input,GetTickCount64())){
                     clearAttackerLook();attackerLookOverride=true;nextFallback=false;
                 }
@@ -534,15 +536,15 @@ void viewRotation(void* camera,float delta,Vec3* view,Vec3* input) {
 void updateAssist(void* combat,uint64_t now) {
     assistScale=1;assistTargetId={};assistAt=0;session.watched[2]=-1;
     if(!playerLocked||!settings.targeting||!settings.aimAssist||!settings.assistStrength)return;
-    auto targetComponent=field<void*>(combat,0x1380);
+    auto targetComponent=field<void*>(combat,Layout::CombatTarget);
     if(!targetComponent)return;
-    auto target=field<void*>(targetComponent,0xa8),pawn=field<void*>(combat,0xa8);
+    auto target=field<void*>(targetComponent,Layout::ComponentOwner),pawn=field<void*>(combat,Layout::ComponentOwner);
     if(!target||!pawn)return;
-    auto pc=field<void*>(pawn,0x2e8);auto camera=pc?field<void*>(pc,0x370):nullptr;
+    auto pc=field<void*>(pawn,Layout::PawnController);auto camera=pc?field<void*>(pc,Layout::ControllerCamera):nullptr;
     if(!camera)return;
     auto id=identity(target);if(!id.address)return;
-    Vec3 point{};method<Vec3*(*)(void*,Vec3*,void*)>(target,0x6f0)(target,&point,pawn);
-    auto location=cameraVector(camera,0x828),rotation=cameraVector(camera,0x820);
+    Vec3 point{};method<Vec3*(*)(void*,Vec3*,void*)>(target,Layout::ActorAimPointSlot)(target,&point,pawn);
+    auto location=cameraVector(camera,Layout::CameraOriginSlot),rotation=cameraVector(camera,Layout::CameraRotationSlot);
     if(!finite(location)||!finite(rotation)||!finite(point))return;
     assistScale=slowdown(directionDot(location,forward(rotation),point),settings.assistStrength);
     assistTargetId=id;assistAt=now;session.watched[2]=id.index;
@@ -554,8 +556,8 @@ void request(void* combat) {
     // Explicit selection, pending hits and same-enemy recovery use other paths.
     if(inRequest||!settings.targeting||deathCheckRemaining||recoveryRemaining||recoveryHold||attackerRemaining||
        (attackerHeldTargetId.address&&!attackerLookOverride)||!eligible(combat))return;
-    auto config=field<void*>(combat,0x9b8);if(!config)return;
-    float parameter=field<float>(config,0x26c);
+    auto config=field<void*>(combat,Layout::CombatConfig);if(!config)return;
+    float parameter=field<float>(config,Layout::TargetingRange);
     if(!std::isfinite(parameter)||parameter<=0||parameter>=1000000)return;
     const auto now=GetTickCount64();
     if(!requestBudget.take(now)){if(settings.debugLogging)++metrics.skipped;return;}
@@ -574,9 +576,9 @@ void clearTarget(void* combat,bool preserveAutomatic=false) {
     clearRecovery();
     if(trackingTargetId.address)clearTracking();
     // The native setter removes delegates and publishes the target change.
-    if(field<void*>(combat,0x1380)){originalSetTarget(combat,nullptr);clearAttackPending=true;}
+    if(field<void*>(combat,Layout::CombatTarget)){originalSetTarget(combat,nullptr);clearAttackPending=true;}
     if(clearAttackPending){originalAttackTarget(combat,nullptr);clearAttackPending=false;}
-    if((field<uint8_t>(combat,0x14a9)!=0)!=playerLocked)originalLock(combat,playerLocked);
+    if((field<uint8_t>(combat,Layout::HardLock)!=0)!=playerLocked)originalLock(combat,playerLocked);
     assistScale=1;assistAt=0;dwell.clear();nextFallback=false;
 }
 void reactToHit(void* combat,void* animation,void* attack,void* response) {
@@ -585,11 +587,11 @@ void reactToHit(void* combat,void* animation,void* attack,void* response) {
     // parry and omniblock. No health-loss threshold or borrowed struct survives.
     if(live()&&attack){
         const bool attacker=settings.lockLastAttacker||settings.autoLockOnHit;
-        if(attacker&&managed(combat)&&(field<uint8_t>(combat,0x8e)&0x10)){
+        if(attacker&&managed(combat)&&(field<uint8_t>(combat,Layout::ComponentFlags)&0x10)){
             if(attacker&&(playerLocked||settings.autoLockOnHit)){
-                auto target=field<void*>(attack,0x28);const auto targetId=identity(target);
-                auto actor=targetId.address?field<void*>(target,0xa8):nullptr;const auto actorId=identity(actor);
-                if(targetId.address&&actorId.address&&target!=combat&&actor!=field<void*>(combat,0xa8)){
+                auto target=field<void*>(attack,Layout::AttackSource);const auto targetId=identity(target);
+                auto actor=targetId.address?field<void*>(target,Layout::ComponentOwner):nullptr;const auto actorId=identity(actor);
+                if(targetId.address&&actorId.address&&target!=combat&&actor!=field<void*>(combat,Layout::ComponentOwner)){
                     clearDeath();clearAttackerLook();nextFallback=false;
                     attackerPendingTargetId=targetId;attackerPendingActorId=actorId;attackerRemaining=1.0;
                     session.watched[8]=targetId.index;session.watched[9]=actorId.index;
@@ -610,13 +612,13 @@ void applyAttacker(void* combat,float delta) {
     if(inRequest||!eligible(combat,settings.autoLockOnHit))return;
     const auto targetId=attackerPendingTargetId,actorId=attackerPendingActorId;
     auto target=resolveAttacker(targetId),actor=resolveAttacker(actorId);
-    if(!target||!actor||field<void*>(target,0xa8)!=actor){clearAttackerPending();return;}
-    if(playerLocked&&field<void*>(combat,0x1380)==target){
+    if(!target||!actor||field<void*>(target,Layout::ComponentOwner)!=actor){clearAttackerPending();return;}
+    if(playerLocked&&field<void*>(combat,Layout::CombatTarget)==target){
         attackerHeldTargetId=identity(target);attackerHeldActorId=identity(actor);
         session.watched[10]=targetId.index;session.watched[11]=actorId.index;
         clearAttackerPending();return;
     }
-    auto config=field<void*>(combat,0x9b8);const float distance=config?field<float>(config,0x26c):0;
+    auto config=field<void*>(combat,Layout::CombatConfig);const float distance=config?field<float>(config,Layout::TargetingRange):0;
     if(!std::isfinite(distance)||distance<=0||distance>=1000000){clearAttackerPending();return;}
     if(!requestBudget.take(GetTickCount64()))return;
     clearAttackerPending(); // A newer nested hit must remain pending.
@@ -634,7 +636,7 @@ void applyAttacker(void* combat,float delta) {
     syncSession();
     session.watched[12]=-1;session.watched[13]=-1;
     if(!attackerSelectionInvalidated&&ownerId==expectedOwner&&resolve(expectedOwner)==combat&&
-       live()&&(settings.lockLastAttacker||settings.autoLockOnHit)&&playerLocked&&field<void*>(combat,0x1380)==target&&resolveAttacker(targetId)&&resolveAttacker(actorId)){
+       live()&&(settings.lockLastAttacker||settings.autoLockOnHit)&&playerLocked&&field<void*>(combat,Layout::CombatTarget)==target&&resolveAttacker(targetId)&&resolveAttacker(actorId)){
         clearRecovery();attackerHeldTargetId=identity(target);attackerHeldActorId=identity(actor);
         session.watched[10]=targetId.index;session.watched[11]=actorId.index;
         dwell.clear();nextFallback=false;
@@ -651,7 +653,7 @@ void applyDeath(void* combat,float delta) {
     }
     deathRemaining-=delta;
     if(inRequest||!eligible(combat,true))return;
-    auto config=field<void*>(combat,0x9b8);const float distance=config?field<float>(config,0x26c):0;
+    auto config=field<void*>(combat,Layout::CombatConfig);const float distance=config?field<float>(config,Layout::TargetingRange):0;
     if(!std::isfinite(distance)||distance<=0||distance>=1000000){clearDeath();return;}
     if(!requestBudget.take(GetTickCount64()))return;
     const auto expectedOwner=ownerId;const auto expectedIntent=lockIntent;
@@ -670,7 +672,7 @@ void applyDeath(void* combat,float delta) {
     if(!attackerSelectionInvalidated&&expectedOwner==ownerId&&expectedIntent==lockIntent&&
        resolve(expectedOwner)==combat&&live()&&settings.autoLockOnHit&&
        playerLocked&&nearestTargetId.address&&resolveAttacker(nearestTargetId)&&resolveAttacker(nearestActorId)&&
-       field<void*>(combat,0x1380)==reinterpret_cast<void*>(nearestTargetId.address)){
+       field<void*>(combat,Layout::CombatTarget)==reinterpret_cast<void*>(nearestTargetId.address)){
         clearDeath();attackerHeldTargetId=identity(reinterpret_cast<void*>(nearestTargetId.address));
         attackerHeldActorId=identity(reinterpret_cast<void*>(nearestActorId.address));
         session.watched[10]=attackerHeldTargetId.index;session.watched[11]=attackerHeldActorId.index;
@@ -707,7 +709,7 @@ void applyCombatStart(void* combat,float delta) {
        !std::isfinite(delta)||delta<0||delta>=startRemaining){clearStart();return;}
     startRemaining-=delta;
     if(inRequest||!eligible(combat,true))return;
-    auto config=field<void*>(combat,0x9b8);const float distance=config?field<float>(config,0x26c):0;
+    auto config=field<void*>(combat,Layout::CombatConfig);const float distance=config?field<float>(config,Layout::TargetingRange):0;
     if(!std::isfinite(distance)||distance<=0||distance>=1000000){clearStart();return;}
     if(!requestBudget.take(GetTickCount64()))return;
     const auto owner=ownerId;const auto intent=lockIntent;
@@ -726,7 +728,7 @@ void applyCombatStart(void* combat,float delta) {
     if(owner==ownerId&&intent==lockIntent&&sameCurrent(combat,owner)&&live()&&startRemaining){
         if(playerLocked){
             if(nearestTargetId.address&&resolveAttacker(nearestTargetId)&&resolveAttacker(nearestActorId)&&
-               field<void*>(combat,0x1380)==reinterpret_cast<void*>(nearestTargetId.address)){
+               field<void*>(combat,Layout::CombatTarget)==reinterpret_cast<void*>(nearestTargetId.address)){
                 attackerHeldTargetId=identity(reinterpret_cast<void*>(nearestTargetId.address));
                 attackerHeldActorId=identity(reinterpret_cast<void*>(nearestActorId.address));
                 session.watched[10]=attackerHeldTargetId.index;session.watched[11]=attackerHeldActorId.index;
@@ -745,12 +747,12 @@ bool applyRecovery(void* combat) {
     if(!recoveryRemaining||!recoveryReady||recoveryRetry||inRequest||attackerRemaining)return false;
     const auto targetId=recoveryTargetId,actorId=recoveryActorId,expectedOwner=ownerId;
     auto target=resolveAttacker(targetId),actor=resolveAttacker(actorId);
-    if(settings.autoLockOnHit&&playerLocked&&!field<void*>(combat,0x1380)&&
-       recoveryDeathIntent==lockIntent&&target&&actor&&field<void*>(target,0xa8)==actor&&field<uint8_t>(target,0xb28)==10){
+    if(settings.autoLockOnHit&&playerLocked&&!field<void*>(combat,Layout::CombatTarget)&&
+       recoveryDeathIntent==lockIntent&&target&&actor&&field<void*>(target,Layout::ComponentOwner)==actor&&field<uint8_t>(target,Layout::CombatState)==10){
         confirmTargetDeath();return false;
     }
-    if(settings.cameraMode!=1||!playerLocked||field<void*>(combat,0x1380)||
-       !target||!actor||field<void*>(target,0xa8)!=actor||field<uint8_t>(target,0xb28)==10){
+    if(settings.cameraMode!=1||!playerLocked||field<void*>(combat,Layout::CombatTarget)||
+       !target||!actor||field<void*>(target,Layout::ComponentOwner)!=actor||field<uint8_t>(target,Layout::CombatState)==10){
         if(settings.debugLogging)++metrics.recoveryMisses;
         abandonRecovery();return false;
     }
@@ -758,7 +760,7 @@ bool applyRecovery(void* combat) {
     // timer. Retry only this identity, at most every 100 gameplay milliseconds,
     // sharing the existing 50ms selection budget and finite loss deadline.
     if(!eligible(combat))return false;
-    auto config=field<void*>(combat,0x9b8);const float distance=config?field<float>(config,0x26c):0;
+    auto config=field<void*>(combat,Layout::CombatConfig);const float distance=config?field<float>(config,Layout::TargetingRange):0;
     if(!std::isfinite(distance)||distance<=0||distance>=1000000){abandonRecovery();return false;}
     if(!requestBudget.take(GetTickCount64()))return false;
     const auto now=GetTickCount64(),lastLook=recoveryLookAt;const bool hadLook=recoveryHadLook;
@@ -775,7 +777,7 @@ bool applyRecovery(void* combat) {
     const bool restored=live()&&settings.cameraMode==1&&playerLocked&&expectedIntent==lockIntent&&
         expectedOwner==ownerId&&resolve(expectedOwner)==combat&&recoveryRemaining&&
         recoveryTargetId==targetId&&recoveryActorId==actorId&&
-        resolveAttacker(targetId)&&resolveAttacker(actorId)&&field<void*>(combat,0x1380)==target;
+        resolveAttacker(targetId)&&resolveAttacker(actorId)&&field<void*>(combat,Layout::CombatTarget)==target;
     if(restored){
         // Native selection may assign the initial serial. The deletion watches
         // remain armed throughout; capture current serials only after success.
@@ -803,15 +805,15 @@ void observeTargetDeath(void* combat,float delta) {
     if(!settings.autoLockOnHit||inRequest)return;
     // Only an already locked current target is inspected; never discover an
     // enemy while idle. Preserve native target-clear side effects via the hook.
-    auto current=field<void*>(combat,0x1380);
-    if(playerLocked&&current&&identity(current).address&&field<uint8_t>(current,0xb28)==10){
+    auto current=field<void*>(combat,Layout::CombatTarget);
+    if(playerLocked&&current&&identity(current).address&&field<uint8_t>(current,Layout::CombatState)==10){
         setTarget(combat,nullptr);return;
     }
     // A disappearing enemy can die before RegainTargetLock, even when recovery
     // is not ready. Apply/manual input invalidate this bridge through lockIntent.
     if(recoveryRemaining&&playerLocked&&!current&&recoveryDeathIntent==lockIntent){
         auto target=resolveAttacker(recoveryTargetId),actor=resolveAttacker(recoveryActorId);
-        if(target&&actor&&field<void*>(target,0xa8)==actor&&field<uint8_t>(target,0xb28)==10){
+        if(target&&actor&&field<void*>(target,Layout::ComponentOwner)==actor&&field<uint8_t>(target,Layout::CombatState)==10){
             confirmTargetDeath();return;
         }
     }
@@ -819,11 +821,11 @@ void observeTargetDeath(void* combat,float delta) {
     if(current||deathCheckIntent!=lockIntent||!std::isfinite(delta)||delta<0||delta>=deathCheckRemaining){clearDeathCheck();return;}
     deathCheckRemaining-=delta;
     auto target=resolveAttacker(deathCheckTargetId),actor=resolveAttacker(deathCheckActorId);
-    if(!target||!actor||field<void*>(target,0xa8)!=actor){clearDeathCheck();return;}
-    if(field<uint8_t>(target,0xb28)==10)confirmTargetDeath();
+    if(!target||!actor||field<void*>(target,Layout::ComponentOwner)!=actor){clearDeathCheck();return;}
+    if(field<uint8_t>(target,Layout::CombatState)==10)confirmTargetDeath();
 }
 void tick(void* pawn,float delta) {
-    auto combat=live()&&pawn?field<void*>(pawn,0xc90):nullptr;
+    auto combat=live()&&pawn?field<void*>(pawn,Layout::PawnCombat):nullptr;
     if(managed(combat)){
         observeTargetDeath(combat,0);
         if(recoveryRemaining){
@@ -834,7 +836,7 @@ void tick(void* pawn,float delta) {
                 abandonRecovery();
             }else{recoveryRemaining-=delta;recoveryRetry=std::max(0.0,recoveryRetry-delta);}
         }
-        if(!(field<uint8_t>(combat,0x8e)&0x10)){
+        if(!(field<uint8_t>(combat,Layout::ComponentFlags)&0x10)){
             if(playerLocked){playerLocked=false;clearAttackPending=true;}
             clearAttacker();clearDeath();
         }
@@ -843,13 +845,13 @@ void tick(void* pawn,float delta) {
     originalTick(pawn,delta);
     if(!live())return;
     syncSession();
-    combat=field<void*>(pawn,0xc90);
+    combat=field<void*>(pawn,Layout::PawnCombat);
     if(managed(combat)){
         observeTargetDeath(combat,delta);
         applyRecovery(combat);
         if(!playerLocked)clearTarget(combat,settings.autoLockOnHit);
         else{
-            if(attackerHeldTargetId.address&&!recoveryRemaining&&reinterpret_cast<uintptr_t>(field<void*>(combat,0x1380))!=attackerHeldTargetId.address)clearAttackerHeld();
+            if(attackerHeldTargetId.address&&!recoveryRemaining&&reinterpret_cast<uintptr_t>(field<void*>(combat,Layout::CombatTarget))!=attackerHeldTargetId.address)clearAttackerHeld();
         }
         applyAttacker(combat,delta);
         applyDeath(combat,delta);
@@ -884,35 +886,35 @@ bool switchTarget(void* combat,uint8_t mode,float distance,bool a,bool b,bool c,
     selecting=combat;
     const auto result=originalSwitch(combat,2,distance,false,false,false,false,false);
     selecting=previous;inRequest=wasRequest;
-    if(!field<void*>(combat,0x1380)&&!settings.targeting){playerLocked=false;originalLock(combat,false);}
+    if(!field<void*>(combat,Layout::CombatTarget)&&!settings.targeting){playerLocked=false;originalLock(combat,false);}
     return result;
 }
 struct List{void** data;int size,capacity;};static_assert(sizeof(List)==16);
 void* pick(void* context) {
     const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
-    if(!live()||!selecting||(caller!=Build::PickerReturn1&&caller!=Build::PickerReturn2)||field<void*>(context,0x48)!=field<void*>(selecting,0xa8))return originalPick(context);
+    if(!live()||!selecting||(caller!=Build::PickerReturn1&&caller!=Build::PickerReturn2)||field<void*>(context,Layout::PickPawn)!=field<void*>(selecting,Layout::ComponentOwner))return originalPick(context);
     // Spread the game's primary/fallback full searches across budget slots.
     // Native/manual requests still execute both immediately. An existing target
     // can be checked alone while waiting, avoiding a visible target clear.
     if(automaticRequest&&fallbackRequest&&caller==Build::PickerReturn1)return nullptr;
     const bool retainOnly=automaticRequest&&!fallbackRequest&&caller==Build::PickerReturn2;
-    auto candidates=field<List*>(context,0x58);
+    auto candidates=field<List*>(context,Layout::PickList);
     if(!candidates||candidates->size<0||candidates->size>candidates->capacity||(!candidates->data&&candidates->size))return nullptr;
-    auto previous=field<void*>(context,0x50);auto flags=field<std::array<uint8_t,6>>(context,0x60);
+    auto previous=field<void*>(context,Layout::PickPrevious);auto flags=field<std::array<uint8_t,6>>(context,Layout::PickFlags);
     if(retainOnly&&!previous)return nullptr;
     struct Restore {
         void* context;void* previous;std::array<uint8_t,6> flags;List* list;void* oldCone;
-        ~Restore(){field<void*>(context,0x50)=previous;field<std::array<uint8_t,6>>(context,0x60)=flags;field<List*>(context,0x58)=list;coneContext=oldCone;}
+        ~Restore(){field<void*>(context,Layout::PickPrevious)=previous;field<std::array<uint8_t,6>>(context,Layout::PickFlags)=flags;field<List*>(context,Layout::PickList)=list;coneContext=oldCone;}
     } restore{context,previous,flags,candidates,coneContext};
     coneContext=context;
-    field<void*>(context,0x50)=nullptr;
-    field<uint8_t>(context,0x61)=1;field<uint8_t>(context,0x62)=2;
-    field<uint8_t>(context,0x63)=0;field<uint8_t>(context,0x64)=1;field<uint8_t>(context,0x65)=0;
+    field<void*>(context,Layout::PickPrevious)=nullptr;
+    field<uint8_t>(context,Layout::PickAngle)=1;field<uint8_t>(context,Layout::PickDirection)=2;
+    field<uint8_t>(context,Layout::PickDistance)=0;field<uint8_t>(context,Layout::PickVisibility)=1;field<uint8_t>(context,Layout::PickBias)=0;
     if(nearestSelecting){
         // One native pass per budget slot, with fallback deferred. Distance is
         // measured from the pawn; the score gate changes only candidate rank.
         if((caller==Build::PickerReturn2)!=nearestFallback)return nullptr;
-        field<uint8_t>(context,0x61)=0;field<uint8_t>(context,0x64)=0;
+        field<uint8_t>(context,Layout::PickAngle)=0;field<uint8_t>(context,Layout::PickVisibility)=0;
         if(settings.debugLogging){++metrics.pickCalls;metrics.candidates+=candidates->size;}
         return originalPick(context);
     }
@@ -922,13 +924,13 @@ void* pick(void* context) {
         auto wanted=recovering?recovering:attackerSelecting;
         bool present=false;for(int i=0;i<candidates->size;++i)if(candidates->data[i]==wanted){present=true;break;}
         if(!present)return nullptr;
-        void* actor=wanted;List singleton{&actor,1,1};field<List*>(context,0x58)=&singleton;
-        field<uint8_t>(context,0x61)=0; // Verified native angular-rejection gate only.
+        void* actor=wanted;List singleton{&actor,1,1};field<List*>(context,Layout::PickList)=&singleton;
+        field<uint8_t>(context,Layout::PickAngle)=0; // Verified native angular-rejection gate only.
         if(settings.debugLogging)++metrics.dwellChecks;
         return originalPick(context)==actor?actor:nullptr;
     }
     List waiting{&previous,1,1};
-    if(retainOnly){field<List*>(context,0x58)=&waiting;if(settings.debugLogging)++metrics.dwellChecks;}
+    if(retainOnly){field<List*>(context,Layout::PickList)=&waiting;if(settings.debugLogging)++metrics.dwellChecks;}
     else if(settings.debugLogging){++metrics.pickCalls;metrics.candidates+=candidates->size;}
     void* chosen=originalPick(context);
     if(automaticRequest&&!fallbackRequest&&!retainOnly&&!chosen)nextFallback=true;
@@ -947,7 +949,7 @@ void* pick(void* context) {
         }
         bool present=false;for(int i=0;i<candidates->size;++i)if(candidates->data[i]==previous){present=true;break;}
         if(!present)return chosen;
-        field<List*>(context,0x58)=&waiting;field<uint8_t>(context,0x61)=0;
+        field<List*>(context,Layout::PickList)=&waiting;field<uint8_t>(context,Layout::PickAngle)=0;
         if(settings.debugLogging)++metrics.dwellChecks;
         return originalPick(context)==previous?previous:chosen;
     }
@@ -958,7 +960,7 @@ void* pick(void* context) {
     if(dwell.ready(reinterpret_cast<uintptr_t>(selecting),reinterpret_cast<uintptr_t>(chosen),GetTickCount64(),settings.delayMs))return chosen;
     // Validate retention through the game's predicate and visibility checks;
     // the temporary list contains only the current target, never a full rescan.
-    List singleton{&previous,1,1};field<List*>(context,0x58)=&singleton;
+    List singleton{&previous,1,1};field<List*>(context,Layout::PickList)=&singleton;
     if(settings.debugLogging)++metrics.dwellChecks;
     return originalPick(context)?previous:chosen;
 }
@@ -987,7 +989,7 @@ void setTarget(void* combat,void* target) {
         }
         if(target&&(nearestSelecting||startAcquiring)){
             nearestTargetId=identity(target);
-            nearestActorId=nearestTargetId.address?identity(field<void*>(target,0xa8)):Identity{};
+            nearestActorId=nearestTargetId.address?identity(field<void*>(target,Layout::ComponentOwner)):Identity{};
             if(!nearestTargetId.address||!nearestActorId.address)return;
             session.watched[12]=nearestTargetId.index;session.watched[13]=nearestActorId.index;
         }
@@ -997,14 +999,14 @@ void setTarget(void* combat,void* target) {
         }
         const auto caller=reinterpret_cast<uintptr_t>(_ReturnAddress())-moduleBase;
         bool temporary=false;
-        auto previous=field<void*>(combat,0x1380);
+        auto previous=field<void*>(combat,Layout::CombatTarget);
         const auto previousId=!target&&previous&&playerLocked?identity(previous):Identity{};
-        const auto previousActor=previousId.address?field<void*>(previous,0xa8):nullptr;
+        const auto previousActor=previousId.address?field<void*>(previous,Layout::ComponentOwner):nullptr;
         const auto previousActorId=identity(previousActor);
         const bool notified=deathNotification&&deathNotification->owner==ownerId&&
             deathNotification->intent==lockIntent&&deathNotification->target==previousId&&
             deathNotification->actor==previousActorId&&previousId.address&&previousActorId.address;
-        const bool dead=previousId.address&&(notified||field<uint8_t>(previous,0xb28)==10);
+        const bool dead=previousId.address&&(notified||field<uint8_t>(previous,Layout::CombatState)==10);
         if(notified&&settings.debugLogging)++metrics.deathEventClears;
         if(!dead&&previousId.address&&previousActorId.address&&settings.autoLockOnHit&&!inRequest&&lockButton!=combat){
             clearDeathCheck();deathCheckTargetId=previousId;deathCheckActorId=previousActorId;
@@ -1012,8 +1014,8 @@ void setTarget(void* combat,void* target) {
             session.watched[14]=previousId.index;session.watched[15]=previousActorId.index;
         }
         if(!dead&&!target&&playerLocked&&settings.cameraMode==1&&temporaryLoss&&temporaryLoss->combat==combat&&caller==Build::LoseLockClearReturn){
-            auto previous=field<void*>(combat,0x1380);const auto id=identity(previous);
-            auto actor=id.address?field<void*>(previous,0xa8):nullptr;const auto actorId=identity(actor);
+            auto previous=field<void*>(combat,Layout::CombatTarget);const auto id=identity(previous);
+            auto actor=id.address?field<void*>(previous,Layout::ComponentOwner):nullptr;const auto actorId=identity(actor);
             const float duration=temporaryLoss->duration;
             if(id.address&&actorId.address&&std::isfinite(duration)&&duration>0&&duration<=60){
                 clearRecovery();recoveryTargetId=id;recoveryActorId=actorId;
@@ -1028,7 +1030,7 @@ void setTarget(void* combat,void* target) {
         // new candidate, death, explicit unlock, or a failed special-loss call.
         if(!dead&&!target&&previous&&playerLocked&&settings.cameraMode==1&&!temporaryLoss&&
            sameCurrent(previous,trackingTargetId)){
-            auto actor=field<void*>(previous,0xa8);
+            auto actor=field<void*>(previous,Layout::ComponentOwner);
             if(sameCurrent(actor,trackingActorId)){
                 const auto id=trackingTargetId,actorId=trackingActorId;
                 clearRecovery();recoveryTargetId=id;recoveryActorId=actorId;
@@ -1041,7 +1043,7 @@ void setTarget(void* combat,void* target) {
         // Disappearance is a gesture boundary even when attacker identity is
         // retained. Pre-loss aiming must not authorize a post-recovery switch.
         if(temporary)attackerGesture.clear();
-        if((target&&!recovering)||(!target&&!temporary&&field<void*>(combat,0x1380)))clearRecovery();
+        if((target&&!recovering)||(!target&&!temporary&&field<void*>(combat,Layout::CombatTarget)))clearRecovery();
         if(!temporary&&reinterpret_cast<uintptr_t>(target)!=attackerHeldTargetId.address){
             if(target&&automaticRequest&&attackerLookOverride&&settings.debugLogging)++metrics.attackerOverrides;
             clearAttackerHeld();
@@ -1070,12 +1072,12 @@ struct DeathScope {
         if(!live()||!settings.autoLockOnHit||!delegate||
            field<void*>(delegate,0)!=at<void*>(Build::TargetDeathDelegateVtable))return;
         syncSession();
-        auto combat=field<void*>(delegate,0x18);
+        auto combat=field<void*>(delegate,Layout::DeathDelegateOwner);
         if(!identity(combat).address||!managed(combat,true)||!playerLocked)return;
-        const auto target=field<void*>(combat,0x1380);const auto targetId=identity(target);
-        auto actor=targetId.address?field<void*>(target,0xa8):nullptr;
+        const auto target=field<void*>(combat,Layout::CombatTarget);const auto targetId=identity(target);
+        auto actor=targetId.address?field<void*>(target,Layout::ComponentOwner):nullptr;
         const auto actorId=identity(actor);
-        if(!targetId.address||!actorId.address||actor==field<void*>(combat,0xa8))return;
+        if(!targetId.address||!actorId.address||actor==field<void*>(combat,Layout::ComponentOwner))return;
         event={ownerId,targetId,actorId,lockIntent};deathNotification=&event;
         if(settings.debugLogging)++metrics.deathEvents;
     }
@@ -1091,12 +1093,12 @@ void* abilityPlayer(void* pawn) {
     if(!live()||!pawn)return nullptr;
     syncSession();
     auto combat=resolve(ownerId);
-    return combat&&field<void*>(combat,0xa8)==pawn&&managed(combat)?combat:nullptr;
+    return combat&&field<void*>(combat,Layout::ComponentOwner)==pawn&&managed(combat)?combat:nullptr;
 }
 void* abilityCombat(void* pawn) {
     auto combat=abilityPlayer(pawn);
     return combat&&!playerLocked&&
-        (field<uint8_t>(combat,0x8e)&0x10)&&!field<uint8_t>(combat,0x1612)?combat:nullptr;
+        (field<uint8_t>(combat,Layout::ComponentFlags)&0x10)&&!field<uint8_t>(combat,Layout::CombatIneligible)?combat:nullptr;
 }
 void* abilityEnemy(void* combat,bool fresh) {
     if(inRequest||focusQuery)return nullptr;
@@ -1105,8 +1107,8 @@ void* abilityEnemy(void* combat,bool fresh) {
         return resolve(abilityTargetId)?resolve(abilityActorId):nullptr;
     }
     abilityQueried=true;abilityQueryAt=now;abilityTargetId={};abilityActorId={};
-    auto config=field<void*>(combat,0x9b8);if(!config)return nullptr;
-    const float distance=field<float>(config,0x26c);
+    auto config=field<void*>(combat,Layout::CombatConfig);if(!config)return nullptr;
+    const float distance=field<float>(config,Layout::TargetingRange);
     if(!std::isfinite(distance)||distance<=0||distance>=1000000)return nullptr;
     const auto before=settings.debugLogging?clockMicros():0;
     if(settings.debugLogging)++metrics.focusQueries;
@@ -1122,7 +1124,7 @@ void* abilityEnemy(void* combat,bool fresh) {
     void* actor{};
     if(live()&&owner==ownerId&&!playerLocked&&query.target.serial>0){
         if(auto target=resolve(query.target)){
-            auto actorId=identity(field<void*>(target,0xa8));
+            auto actorId=identity(field<void*>(target,Layout::ComponentOwner));
             if(actorId.address){abilityTargetId=query.target;abilityActorId=actorId;actor=resolve(actorId);}
         }
     }
@@ -1138,8 +1140,8 @@ bool routeAbility(void* ability,void* pawn,void* combat,uint8_t* reason,bool* de
     const bool accepted=originalCanAbility(ability,pawn,pawn,reason,detail);
     if(accepted)return true;
     if(!abilityCombat(pawn)||resolve(ownerId)!=combat)return false;
-    const int level=method<int(*)(void*,void*)>(ability,0x4e0)(ability,pawn);
-    const auto type=method<uint8_t(*)(void*,int)>(ability,0x540)(ability,level);
+    const int level=method<int(*)(void*,void*)>(ability,Layout::AbilityLevelSlot)(ability,pawn);
+    const auto type=method<uint8_t(*)(void*,int)>(ability,Layout::AbilityTargetTypeSlot)(ability,level);
     if(type!=0&&type!=2&&type!=3)return false;
     // Unlocked casts follow camera aim, never a leftover focus actor.
     target=abilityEnemy(combat,fresh);
@@ -1164,7 +1166,7 @@ void* focusActor(void* focus) {
     return originalFocusActor(focus);
 }
 bool activationValidator(void* ability) {
-    auto validator=method<CanAbility>(ability,0x4d0);
+    auto validator=method<CanAbility>(ability,Layout::AbilityValidatorSlot);
     return validator==at<CanAbility>(Build::CanAbility)||
         (spellValidationSupported&&validator==at<CanAbility>(Build::SpellCanAbility));
 }
@@ -1174,9 +1176,9 @@ void blendView(void* controller,void* target,float duration,uint8_t function,flo
                caller==Build::FocusTargetViewReturn)){
         syncSession();
         auto combat=resolve(ownerId);
-        if(combat&&!playerLocked&&!scriptedCamera&&field<uint8_t>(combat,0xb28)!=11){
-            auto pawn=field<void*>(combat,0xa8);
-            if(pawn&&field<void*>(pawn,0x2e8)==controller&&field<void*>(pawn,0xc90)==combat&&
+        if(combat&&!playerLocked&&!scriptedCamera&&field<uint8_t>(combat,Layout::CombatState)!=11){
+            auto pawn=field<void*>(combat,Layout::ComponentOwner);
+            if(pawn&&field<void*>(pawn,Layout::PawnController)==controller&&field<void*>(pawn,Layout::PawnCombat)==combat&&
                gameplay(pawn,true,true)==2){
                 // Target selection and execution keep their actor. Prevent the
                 // separate focus camera blend before it changes the view target;
@@ -1199,12 +1201,12 @@ void traceAbility(const wchar_t* stage,const wchar_t* outcome,void* focus,void* 
         return reinterpret_cast<RC::Unreal::UObject*>(object)->GetName().substr(0,128);
     };
     const auto focusId=identity(focus),abilityId=identity(ability),targetId=identity(target),pawnId=identity(pawn);
-    const auto validator=abilityId.address?reinterpret_cast<uintptr_t>(method<CanAbility>(ability,0x4d0)):0;
+    const auto validator=abilityId.address?reinterpret_cast<uintptr_t>(method<CanAbility>(ability,Layout::AbilityValidatorSlot)):0;
     RC::Output::send(std::wstring(L"[CombatCamera] ability-cast stage=")+stage+L" outcome="+outcome+
         L" ability="+name(ability)+L" validator="+std::to_wstring(validator>=moduleBase?validator-moduleBase:validator)+
         L" target="+(targetId.address?(target==pawn?std::wstring(L"self"):name(target)):std::wstring(L"none"))+
         L" targetIndex="+std::to_wstring(targetId.index)+L" playerIndex="+std::to_wstring(pawnId.index)+
-        L" locked="+std::to_wstring(playerLocked)+L" focusMode="+std::to_wstring(focusId.address?field<uint8_t>(focus,0x270):255)+
+        L" locked="+std::to_wstring(playerLocked)+L" focusMode="+std::to_wstring(focusId.address?field<uint8_t>(focus,Layout::FocusMode):255)+
         L" reason="+std::to_wstring(reason)+L"\n");
 }
 bool activationTarget(void* focus,void* ability,void* pawn,void* combat,void*& target,uint8_t& reason) {
@@ -1222,7 +1224,7 @@ bool activationTarget(void* focus,void* ability,void* pawn,void* combat,void*& t
     return true;
 }
 bool planAbility(void* focus,void* ability) {
-    auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
+    auto pawn=live()&&focus?field<void*>(focus,Layout::ComponentOwner):nullptr;
     auto combat=abilityPlayer(pawn);
     // Respect specialised native activation overrides rather than calling a
     // base validator on an unknown ability implementation.
@@ -1250,7 +1252,7 @@ void instantAbility(void* focus,void* ability) {
         else if(settings.debugLogging)++metrics.abilityRejected;
         return;
     }
-    auto pawn=live()&&focus?field<void*>(focus,0xa8):nullptr;
+    auto pawn=live()&&focus?field<void*>(focus,Layout::ComponentOwner):nullptr;
     auto combat=abilityPlayer(pawn);
     if(!ability||!combat||!activationValidator(ability)){
         traceAbility(L"instant",!ability?L"native-missing-ability":!combat?L"native-unmanaged":L"native-unknown-validator",focus,ability,pawn,nullptr);
@@ -1294,34 +1296,43 @@ void lockTarget(void* combat,bool locked) {
     originalLock(combat,locked);
     if(local){if(!playerLocked)clearTracking();managed(combat,true);}
 }
-bool fromLockButton(void* combat,void* frame,uintptr_t offset) {
+bool fromLockButton(void* combat,void* frame,bool switching) {
     if(!managed(combat)||!frame)return false;
-    // UE 5.5 FFrame and UStruct::Script layouts, checked against this build.
-    // These two exact bytecode calls belong to IA_Combat_LockTarget. The native
-    // thunks still decode all parameters and advance the VM normally.
-    auto node=field<void*>(frame,0x10),pawn=field<void*>(combat,0xa8);
-    if(!node||field<void*>(frame,0x18)!=pawn||field<uint64_t>(node,0x18)!=Build::playerGraphName)return false;
-    auto outer=field<void*>(node,0x20);
-    if(!outer||field<uint64_t>(outer,0x18)!=Build::playerClassName)return false;
-    auto script=field<uintptr_t>(node,0x60),code=field<uintptr_t>(frame,0x20);
-    const auto pc=code>=script?code-script:UINTPTR_MAX;
-    if(script&&field<int>(node,0x68)==12194){
-        if(pc==offset)return true;
-        if(offset==0x8a9&&(pc==0x528||pc==0x6ba))return false; // Stock next/previous actions.
-    }
-    // A changed player Blueprint must not leave the player unable to lock.
-    inputSupported=false;active=false;clearSession();
-    if(settings.logLevel>=1)RC::Output::send(L"[CombatCamera][ERROR] Player target-lock input graph differs from the supported build; mod disabled for this session.\n");
+    auto node=field<void*>(frame,Layout::FrameNode),pawn=field<void*>(combat,Layout::ComponentOwner);
+    if(!node||field<void*>(frame,Layout::FrameObject)!=pawn||
+       field<uint64_t>(node,Layout::ObjectName)!=Build::playerGraphName)return false;
+    auto outer=field<void*>(node,Layout::ObjectOuter);
+    if(!outer||field<uint64_t>(outer,Layout::ObjectName)!=Build::playerClassName)return false;
+    auto package=field<void*>(outer,Layout::ObjectOuter);
+    if(!package||field<uint64_t>(package,Layout::ObjectName)!=LockInput::packageName)return false;
+    auto script=field<uintptr_t>(node,Layout::ScriptData),code=field<uintptr_t>(frame,Layout::FrameCode);
+    const auto length=field<int>(node,Layout::ScriptSize);
+    auto object=[](void* fn,uint64_t name,uint64_t ownerName) {
+        if(!identity(fn).address||field<uint64_t>(fn,Layout::ObjectName)!=name)return false;
+        auto owner=field<void*>(fn,Layout::ObjectOuter);
+        return identity(owner).address&&field<uint64_t>(owner,Layout::ObjectName)==ownerName;
+    };
+    const auto route=length>=0&&code>=script?
+        LockInput::classify(reinterpret_cast<unsigned char*>(script),static_cast<size_t>(length),code-script,switching,object):
+        LockInput::Route::Invalid;
+    if(route==LockInput::Route::Toggle)return true;
+    if(route==LockInput::Route::Next||route==LockInput::Route::Previous)return false;
+    // Relinquish the native camera before clearing ownership. The independent
+    // center-dot hook continues; unsafe targeting/camera overrides stop.
+    inputSupported=false;active=false;cameraOwner.store(nullptr,std::memory_order_release);
+    at<void(*)(void*)>(Build::AttachDirect)(combat);
+    clearSession();
+    if(settings.logLevel>=1)RC::Output::send(L"[CombatCamera][ERROR] Player target-lock input expression is unsupported; targeting and camera overrides disabled for this session. Center dot remains available.\n");
     return false;
 }
 void lockScript(void* combat,void* frame,void* result) {
     auto previous=lockButton;
-    lockButton=fromLockButton(combat,frame,0x84b)?combat:nullptr;
+    lockButton=fromLockButton(combat,frame,false)?combat:nullptr;
     originalLockScript(combat,frame,result);lockButton=previous;
 }
 void switchScript(void* combat,void* frame,void* result) {
     auto previous=lockButton;
-    lockButton=fromLockButton(combat,frame,0x8a9)?combat:nullptr;
+    lockButton=fromLockButton(combat,frame,true)?combat:nullptr;
     originalSwitchScript(combat,frame,result);lockButton=previous;
 }
 bool actionTarget(void* combat) {
@@ -1332,13 +1343,13 @@ void attackTarget(void* combat,void* target) {
 }
 void draw(void* hud) {
     originalDraw(hud);
-    if(!live()||!settings.crosshair)return;
-    auto pc=field<void*>(hud,0x2b8);auto pawn=pc?field<void*>(pc,0x8b8):nullptr;
-    if(!pawn||field<void*>(pc,0x368)!=hud)return;
+    if(!installed.load()||!settings.enabled||GetCurrentThreadId()!=gameThread||!settings.crosshair)return;
+    auto pc=field<void*>(hud,Layout::HUDController);auto pawn=pc?field<void*>(pc,Layout::ControllerCharacter):nullptr;
+    if(!pawn||field<void*>(pc,Layout::ControllerHUD)!=hud)return;
     auto state=gameplay(pawn);
     if(!state||(settings.crosshair==1&&state!=2))return;
-    auto canvas=field<void*>(hud,0x308);if(!canvas)return;
-    auto width=field<int>(canvas,0x40),height=field<int>(canvas,0x44);
+    auto canvas=field<void*>(hud,Layout::HUDCanvas);if(!canvas)return;
+    auto width=field<int>(canvas,Layout::CanvasWidth),height=field<int>(canvas,Layout::CanvasHeight);
     if(width<16||height<16||width>32768||height>32768)return;
     struct Vec2{double x,y;};struct Color{float r,g,b,a;};
     using Box=void(*)(void*,const Vec2*,const Vec2*,float,const Color*);
@@ -1356,19 +1367,19 @@ bool querySetting(void* owner,uint8_t id,void* value) {
 InputValue* modify(void* modifier,InputValue* result,void* input,const InputValue* value,float delta) {
     if(!live()||!settings.targeting||!settings.aimAssist||!settings.assistStrength)return originalModify(modifier,result,input,value,delta);
     syncSession();
-    auto action=field<void*>(modifier,0x20);
+    auto action=field<void*>(modifier,Layout::ObjectOuter);
     // Exact action/package FNames are supplied by the startup binding, and are
     // numeric values only. Never retain a borrowed Lua object or engine struct.
-    if(!action||field<uint64_t>(action,0x18)!=Build::lookName||!field<void*>(action,0x20)||
-       field<uint64_t>(field<void*>(action,0x20),0x18)!=Build::lookPackageName)return originalModify(modifier,result,input,value,delta);
-    auto pc=input?field<void*>(input,0x20):nullptr;auto pawn=pc?field<void*>(pc,0x8b8):nullptr;
-    auto combat=pawn?field<void*>(pawn,0xc90):nullptr;
-    if(!pc||field<void*>(pc,0x430)!=input||!eligible(combat))return originalModify(modifier,result,input,value,delta);
+    if(!action||field<uint64_t>(action,Layout::ObjectName)!=Build::lookName||!field<void*>(action,Layout::ObjectOuter)||
+       field<uint64_t>(field<void*>(action,Layout::ObjectOuter),Layout::ObjectName)!=Build::lookPackageName)return originalModify(modifier,result,input,value,delta);
+    auto pc=input?field<void*>(input,Layout::ObjectOuter):nullptr;auto pawn=pc?field<void*>(pc,Layout::ControllerCharacter):nullptr;
+    auto combat=pawn?field<void*>(pawn,Layout::PawnCombat):nullptr;
+    if(!pc||field<void*>(pc,Layout::ControllerInput)!=input||!eligible(combat))return originalModify(modifier,result,input,value,delta);
     InputRoute route;auto old=inputRoute;inputRoute=&route;
     auto output=originalModify(modifier,result,input,value,delta);inputRoute=old;
-    auto target=field<void*>(combat,0x1380);auto now=GetTickCount64();
+    auto target=field<void*>(combat,Layout::CombatTarget);auto now=GetTickCount64();
     if(output!=result||!output||output->type!=2||!route.gamepad||route.mouse||!target||
-       !sameCurrent(field<void*>(target,0xa8),assistTargetId)||now<assistAt||now-assistAt>150||assistScale>=1)return output;
+       !sameCurrent(field<void*>(target,Layout::ComponentOwner),assistTargetId)||now<assistAt||now-assistAt>150||assistScale>=1)return output;
     float mx{},my{};at<void(*)(void*,float*,float*)>(Build::MouseDelta)(pc,&mx,&my);
     if(mx!=0||my!=0||!finite(output->value))return output;
     output->value.x*=assistScale;output->value.y*=assistScale;
@@ -1405,12 +1416,12 @@ extern "C" bool ShouldPreventCameraAttach(void* combat) {
 extern "C" bool ResolveFreeDirection(void* combat,Vec3* direction) {
     if(!managed(combat)||playerLocked)return false;
     const auto before=settings.debugLogging?clockMicros():0;
-    auto pawn=field<void*>(combat,0xa8),pc=field<void*>(pawn,0x2e8);
-    auto camera=field<void*>(pc,0x370);
+    auto pawn=field<void*>(combat,Layout::ComponentOwner),pc=field<void*>(pawn,Layout::PawnController);
+    auto camera=field<void*>(pc,Layout::ControllerCamera);
     bool resolved=false;
     if(camera){
         Vec3 rotation{};
-        auto getRotation=method<Vec3*(*)(void*,Vec3*)>(camera,0x820);
+        auto getRotation=method<Vec3*(*)(void*,Vec3*)>(camera,Layout::CameraRotationSlot);
         auto value=getRotation?getRotation(camera,&rotation):nullptr;
         if(value&&finite(*value)){
             // Grounded attack direction uses yaw even when looking straight
@@ -1462,19 +1473,19 @@ void deactivate(){active=false;cameraOwner.store(nullptr,std::memory_order_relea
 bool start(std::wstring& error) {
     if(attempted){error=startError;return installed.load();}attempted=true;gameThread=GetCurrentThreadId();moduleBase=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
     try{
-        NativeCompatibility::validateContract(moduleBase,Build::code,Build::pointers);
+        Build::validateCore(moduleBase);
         for(auto& site:Build::guards)if(!NativeCompatibility::accessible(moduleBase,site.rva,site.size,true)
             ||std::memcmp(at<void*>(site.rva),site.bytes.data(),site.size)!=0)
             throw std::runtime_error("Game code differs at hook RVA "+NativeCompatibility::location(site.rva)+"; no patches installed");
         bool focusSupported=true;
-        try{NativeCompatibility::validateContract(moduleBase,Build::focusCode,std::array<NativeCompatibility::Pointer,0>{});}
+        try{Build::validateFocus(moduleBase);}
         catch(const std::exception& failure){
             focusSupported=false;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Unlocked ability targeting unavailable: "+std::wstring(reason.begin(),reason.end())+L". Camera features remain available.\n");
         }
         if(focusSupported){
             try{
-                NativeCompatibility::validateContract(moduleBase,Build::spellValidationCode,std::array<NativeCompatibility::Pointer,0>{});
+                Build::validateSpell(moduleBase);
                 spellValidationSupported=true;
             }catch(const std::exception& failure){
                 const std::string reason=failure.what();
@@ -1482,26 +1493,35 @@ bool start(std::wstring& error) {
             }
         }
         bool focusViewSupported=true;
-        try{NativeCompatibility::validateContract(moduleBase,Build::focusViewCode,Build::focusViewPointers);}
+        try{Build::validateFocusView(moduleBase);}
         catch(const std::exception& failure){
             focusViewSupported=false;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Unlocked ability camera protection unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera and ability features remain available.\n");
         }
-        try{NativeCompatibility::validateContract(moduleBase,Build::effectCameraCode,Build::effectCameraPointers);effectCameraSupported=true;}
+        try{Build::validateEffect(moduleBase);effectCameraSupported=true;}
         catch(const std::exception& failure){
             effectCameraSupported=false;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Scripted effect-camera handoff unavailable: "+std::wstring(reason.begin(),reason.end())+L". Synchronised-action protection and other features remain available.\n");
         }
         bool deathEventsSupported=true;
-        try{NativeCompatibility::validateContract(moduleBase,Build::targetDeathCode,Build::targetDeathPointers);}
+        try{Build::validateDeath(moduleBase);}
         catch(const std::exception& failure){
             deathEventsSupported=false;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Target-death notification unavailable: "+std::wstring(reason.begin(),reason.end())+L". State-based death detection and other features remain available.\n");
         }
+        bool controllerSupported=true,hudSupported=true;
+        try{Build::validateController(moduleBase);}catch(const std::exception& failure){
+            controllerSupported=false;const std::string reason=failure.what();
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Controller slowdown unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other features remain available.\n");
+        }
+        try{Build::validateHUD(moduleBase);}catch(const std::exception& failure){
+            hudSupported=false;const std::string reason=failure.what();
+            if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Center dot unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other features remain available.\n");
+        }
         uintptr_t combatStartRva{},combatEndRva{};
         try{
-            combatStartRva=CombatEvents::resolve(moduleBase,0x7e21270,"OnCombatStarted");
-            combatEndRva=CombatEvents::resolve(moduleBase,0x7e21260,"OnCombatEnded");
+            combatStartRva=CombatEvents::resolve(moduleBase,0x80af390,"OnCombatStarted");
+            combatEndRva=CombatEvents::resolve(moduleBase,0x80af380,"OnCombatEnded");
         }catch(const std::exception& failure){
             combatStartRva=combatEndRva=0;const std::string reason=failure.what();
             if(settings.logLevel>=2)RC::Output::send(L"[CombatCamera][WARN] Combat-start lock unavailable: "+std::wstring(reason.begin(),reason.end())+L". Other camera features remain available.\n");
@@ -1513,6 +1533,9 @@ bool start(std::wstring& error) {
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::lookPackageName,"/Game/_Dawnwalker/Player/Input/Actions/Traversal/IA_Look",1);
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::playerGraphName,"ExecuteUbergraph_BP_PlayerCharacter",1);
         at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&Build::playerClassName,"BP_PlayerCharacter_C",1);
+        for(size_t i=0;i<LockInput::names.size();++i)at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&LockInput::ids[i],LockInput::names[i],1);
+        at<void(*)(uint64_t*,const char*,int)>(Build::MakeName)(&LockInput::packageName,"/Game/_Dawnwalker/Player/BP_PlayerCharacter",1);
+        if(!LockInput::packageName||std::any_of(LockInput::ids.begin(),LockInput::ids.end(),[](auto n){return !n;}))throw std::runtime_error("Lock-input function names are unavailable");
         if(!Build::lookName||!Build::lookPackageName||!Build::playerGraphName||!Build::playerClassName)throw std::runtime_error("Player input action names are unavailable");
         CameraContinue=at<void*>(Build::CameraResume);ConeContinue=at<void*>(Build::ConeResume);
         hook(Build::Camera,reinterpret_cast<void*>(&CameraGate),CameraOriginal);
@@ -1539,9 +1562,10 @@ bool start(std::wstring& error) {
             hook(combatStartRva,&combatStart,originalCombatStart);
             hook(combatEndRva,&combatEnd,originalCombatEnd);
         }
-        hook(Build::DrawHUD,&draw,originalDraw);hook(Build::Modify,&modify,originalModify);
+        if(hudSupported)hook(Build::DrawHUD,&draw,originalDraw);
+        if(controllerSupported)hook(Build::Modify,&modify,originalModify);
         hook(Build::ViewRotation,&viewRotation,originalViewRotation);
-        hook(Build::QuerySetting,&querySetting,originalSettingQuery);
+        if(controllerSupported)hook(Build::QuerySetting,&querySetting,originalSettingQuery);
         hook(Build::LockScript,&lockScript,originalLockScript);hook(Build::SwitchScript,&switchScript,originalSwitchScript);
         hook(Build::ActionTarget,&actionTarget,originalActionTarget);hook(Build::AttackTarget,&attackTarget,originalAttackTarget);
         ForwardContinue=at<void*>(Build::FreeDirection);

@@ -73,10 +73,10 @@
         "VortexExtension"
       ],
       "pending": {
-        "impact": "none",
-        "rationale": "Matches the verified Nexus release.",
+        "impact": "patch",
+        "rationale": "Final reviewed 3.6.0 baseline delta: behavior-preserving Dawnwalker 1.1 native port, operation contracts, current lock-input validation, decoder licenses and compatibility/logging documentation; settings schema, defaults and behavior retained.",
         "majorOverride": false,
-        "reviewedInputs": "f8ec1efe01d72353a7db3776175d310513bfefc702673898515f44ab2964bd31",
+        "reviewedInputs": "d2cd6c922e932e2b1be44ade4bbd6156d501f67d3792687b404bda3c85452052",
         "divergenceReviewed": false
       },
       "publication": {

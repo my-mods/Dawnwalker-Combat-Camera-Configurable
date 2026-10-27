@@ -7,7 +7,7 @@
   {
     "type": "attribute",
     "key": "version",
-    "value": "3.6.0"
+    "value": "3.6.1-dev"
   },
   {
     "type": "attribute",
@@ -32,7 +32,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -53,7 +55,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -74,7 +78,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -95,7 +101,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -116,7 +124,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -137,7 +147,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -158,7 +170,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -179,7 +193,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -200,7 +216,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -221,7 +239,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -242,7 +262,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -263,7 +285,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -284,7 +308,9 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   },
   {
@@ -305,7 +331,55 @@
       "Nexus/MEDIA-CREDITS.md",
       "LICENSES/fmt.txt",
       "LICENSES/MinHook.txt",
-      "LICENSES/UE4SS.txt"
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "LICENSES/Zycore.txt",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "Nexus/description.bbcode",
+      "Nexus/summary.txt",
+      "Nexus/file-description.txt",
+      "Nexus/release-notes.md",
+      "Nexus/listing.json",
+      "Nexus/MEDIA-CREDITS.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
+    ]
+  },
+  {
+    "type": "attribute",
+    "source": "LICENSES/Zydis.txt",
+    "key": "modSettingsReleaseMaterials",
+    "value": [
+      "mod.manifest",
+      "README.txt",
+      "LICENSE",
+      "CHANGELOG.md",
+      "THIRD-PARTY-NOTICES.md",
+      "Nexus/description.bbcode",
+      "Nexus/summary.txt",
+      "Nexus/file-description.txt",
+      "Nexus/release-notes.md",
+      "Nexus/listing.json",
+      "Nexus/MEDIA-CREDITS.md",
+      "LICENSES/fmt.txt",
+      "LICENSES/MinHook.txt",
+      "LICENSES/UE4SS.txt",
+      "LICENSES/Zycore.txt",
+      "LICENSES/Zydis.txt"
     ]
   }
 ]

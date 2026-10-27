@@ -7,4 +7,7 @@
 - The CMake SDK setup and host import declarations were adapted from the MIT-licensed [Quiet Dawn - Configurable HUD](https://github.com/my-mods/Dawnwalker-Quiet-Dawn-Configurable-HUD), copyright 2026 my-mods. The camera and targeting implementation is separate.
 - Functional inspiration: [Free Combat Camera – Camera Directed Targeting](https://www.nexusmods.com/thebloodofdawnwalker/mods/340), inspected version 0.5.11. Original DLL SHA-256: `d58ba2c63098999578a743518c2f4bc6c753cf25cd233198dec443257fad683a`. No code from the original mod was copied or reused. The original DLL, configuration and bootstrap are not distributed by this project.
 
-Pinned ImGui, ImGuiColorTextEdit and Zydis headers satisfy SDK includes; their libraries are not linked into this mod. Their revisions appear in the CMake file.
+Pinned ImGui and ImGuiColorTextEdit headers satisfy SDK includes; their libraries are not linked into this mod. Their revisions appear in the CMake file.
+
+- **Zydis 4.1.1** and its pinned **Zycore** dependency are statically linked for native instruction decoding. MIT license texts are included in LICENSES/Zydis.txt and LICENSES/Zycore.txt. [Zydis source](https://github.com/zyantific/zydis), [Zycore source](https://github.com/zyantific/zycore-c).
+- The operation-contract validator was adapted from the MIT-licensed Easier Parry and Dodge While Blocking mod, copyright 2026 my-mods. Its validation scope and bindings are specific to Combat Camera.

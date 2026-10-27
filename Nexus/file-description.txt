@@ -1,1 +1,1 @@
-Optionally lock onto a camera-facing or closest enemy when combat starts with Smooth or Native tracking. Off by default.
+Combat camera and configurable targeting for Dawnwalker 1.1, with the existing camera modes, controls and defaults.

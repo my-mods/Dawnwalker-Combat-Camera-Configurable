@@ -7,7 +7,7 @@
     "modId": 480,
     "fileId": 3169
   },
-  "version": "3.6.0",
+  "version": "3.6.1-dev",
   "category": "Gameplay",
   "author": "my-mods",
   "summary": "Choose Free Camera, Smooth Tracking or Native Tracking independently of target selection. Smooth tracking gently follows locked enemies, yields to manual camera movement, and resumes after an adjustable delay. Set its tracking strength in Mod Setting Menu.",
@@ -20,10 +20,10 @@
   "file": {
     "displayName": "Combat Camera - Configurable",
     "filename": "Combat-Camera-Configurable.zip",
-    "version": "3.6.0",
+    "version": "3.6.1-dev",
     "category": "Main",
     "modManagerDownload": true,
-    "description": "Optionally lock onto a camera-facing or closest enemy when combat starts with Smooth or Native tracking. Off by default."
+    "description": "Combat camera and configurable targeting for Dawnwalker 1.1, with the existing camera modes, controls and defaults."
   },
   "requirements": [
     {
@@ -38,7 +38,12 @@
       "version": "1.0.7.1 or later (Steam/GOG or GamePass file)"
     }
   ],
-  "externalRequirements": [],
+  "externalRequirements": [
+    {
+      "name": "The Blood of Dawnwalker",
+      "version": "1.1 / Steam build 25915545"
+    }
+  ],
   "source": "https://github.com/my-mods/Dawnwalker-Combat-Camera-Configurable",
   "codeLicense": "MIT",
   "permissionsNote": "Original code may be used, modified, converted and redistributed, including commercially, under the MIT license. Retain the license and third-party notices. This grant does not cover third-party gameplay imagery or change the terms of bundled dependencies.",

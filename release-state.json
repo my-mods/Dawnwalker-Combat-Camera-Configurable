@@ -76,7 +76,7 @@
         "impact": "patch",
         "rationale": "Final reviewed 3.6.0 baseline delta: behavior-preserving Dawnwalker 1.1 native port, operation contracts, current lock-input validation, decoder licenses and compatibility/logging documentation; settings schema, defaults and behavior retained.",
         "majorOverride": false,
-        "reviewedInputs": "d2cd6c922e932e2b1be44ade4bbd6156d501f67d3792687b404bda3c85452052",
+        "reviewedInputs": "9a6c126bcbafbaedc9a8cec9f1fef4bd4f07e896401628b10f93c0ae1ed8797a",
         "divergenceReviewed": false
       },
       "publication": {

@@ -7,7 +7,7 @@
     "modId": 480,
     "fileId": 3169
   },
-  "version": "3.6.1-dev",
+  "version": "3.6.1",
   "category": "Gameplay",
   "author": "my-mods",
   "summary": "Choose Free Camera, Smooth Tracking or Native Tracking independently of target selection. Smooth tracking gently follows locked enemies, yields to manual camera movement, and resumes after an adjustable delay. Set its tracking strength in Mod Setting Menu.",
@@ -20,7 +20,7 @@
   "file": {
     "displayName": "Combat Camera - Configurable",
     "filename": "Combat-Camera-Configurable.zip",
-    "version": "3.6.1-dev",
+    "version": "3.6.1",
     "category": "Main",
     "modManagerDownload": true,
     "description": "Combat camera and configurable targeting for Dawnwalker 1.1, with the existing camera modes, controls and defaults."
